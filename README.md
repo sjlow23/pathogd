@@ -50,7 +50,7 @@ PathoGD incorporates multiple bioinformatics tools for performing the individual
    chmod u+x $CONDA_PREFIX/bin/pathogd $CONDA_PREFIX/bin/*.R
    ```
 
-6. You will also need Prokka and Roary installed on your system and in your $PATH. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
+6. You will also need Prokka and Roary installed on your system and in your `PATH`. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
 
 
 <p align="right">(<a href="#installation-top">back to top</a>)</p>
