@@ -1,0 +1,82 @@
+#################################################
+## Define parameters for running PathoGD
+#################################################
+
+
+## NCBI database to download genomes from
+## Choose from 'refseq' or 'genbank' or 'both'
+## There are overlaps between refseq and genbank genome assemblies, so better to choose only one
+db|genbank
+
+
+## Target species name
+## Can be multiple- separate species by comma (without space after comma)
+## Highest taxonomic rank that can be specified- genus
+target_species|Mycoplasmoides genitalium
+
+
+## Target species NCBI taxonomy id(s)
+## Only use taxids defined at the species level
+## Can be multiple- separate taxids by comma without space
+target_species_taxid|2097
+
+
+## Offtarget species name
+## Can be multiple- separate species by comma without space
+## Highest taxonomic rank that can be specified- genus
+offtarget_species|Mycoplasmoides pneumoniae,Ureaplasma urealyticum
+
+
+## Offtarget species NCBI taxonomy taxid(s)
+## Only use taxids defined at the species level
+## Can be multiple- separate taxids by comma without space
+offtarget_species_taxid|2104,2130
+
+
+## Domain of organism
+## Choose from 'all', 'archaea', 'bacteria', 'fungi', 'invertebrate', 'metagenomes', 'plant', 'protozoa', 'vertebrate_mammalian', 'vertebrate_other', 'viral'
+domain|bacteria
+
+
+## Assembly level of genomes to download 
+## Choose from 'all', 'complete', 'chromosome', 'scaffold', 'contig')
+## Can be multiple- separate levels by comma without space
+assembly_level|complete,chromosome
+
+
+## Size of gRNA (max 32)
+kmer|22
+
+
+## Threshold of gRNA prevalence across target genomes (percentage of target genomes that gRNA must be present in)
+threshold|80
+
+
+## Allow mismatches when comparing target gRNA sequences to non-target and human genome
+## Enter 'yes' or 'no'
+mismatch|yes
+
+
+## Design primers?
+## Enter 'yes' or 'no'
+primer_design|yes
+
+
+## Reference annotation file in GenBank format provided?
+## For use with Prokka
+## Enter 'yes' or 'no'
+ref_annot|no
+
+
+## Perform target genome subsampling?
+## Enter number of genomes to subsample if yes, or 'no' if no subsampling required
+subsample|20
+
+
+## Prokka conda environment
+prokka_env|prokka-1.14.6
+
+
+## Roary conda environment
+roary_env|roary-3.13.0
+
