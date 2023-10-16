@@ -7,7 +7,7 @@ PathoGD is a bioinformatic pipeline for the rapid and high-throughput design of 
 
 ## Introduction
 
-The increasing availability of bacterial draft and whole-genome sequences provide an opportunity to identify alternative diagnostic markers from previously unexplored genomic regions. PathoGD was developed to facilitate the design of highly specific RPA primers and gRNAs for CRISPR-Cas12a-based pathogen detection. It provides a streamlined workflow to accelerate the *in silico* aspect of a CRISPR-Cas12a assay design, a task which can be very manual and labor-intensive. 
+The increasing availability of bacterial draft and whole-genome sequences provide an opportunity to identify alternative diagnostic markers from previously unexplored genomic regions. PathoGD was developed to facilitate the design of highly specific RPA primers and gRNAs for CRISPR-Cas12a-based pathogen detection. It provides a streamlined workflow to accelerate the *in silico* aspect of a CRISPR-Cas12a assay design. 
 
 PathoGD incorporates multiple bioinformatics tools for performing the individual steps in the pipeline. It requires two databases- target and non-target- containing the genomes of the pathogen to be detected and closely-related organisms potentially resulting in cross-reactivity, respectively, for the selection of a highly-specific target region to be amplified.
 
@@ -100,6 +100,12 @@ The following workflows are available for primer and gRNA design:
 
 
 <p align="right">(<a href="#modules-top">back to top</a>)</p>
+
+
+## Pipeline overview
+
+![PathoGD pipeline](images/pathogd_pipeline.png)
+
 
 
 <a name="config-top"></a>
