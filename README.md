@@ -32,18 +32,25 @@ PathoGD incorporates multiple bioinformatics tools for performing the individual
    ```sh
    conda env create --prefix /dir/to/pathogd -f pathogd.yaml
    ```
-3. Move scripts into bin directory of conda environment
+3. Activate conda environment
+
+   ```sh
+   conda activate pathogd
+   conda activate /dir/to/pathogd
+   ```
+
+4. Move scripts into bin directory of conda environment
    ```sh
    mv pathogd $CONDA_PREFIX/bin/
    mv scripts/* $CONDA_PREFIX/bin/
    ```
 
-4. Make scripts executable
+5. Make scripts executable
    ```sh
    chmod u+x $CONDA_PREFIX/bin/pathogd $CONDA_PREFIX/bin/*.R
    ```
 
-5. You will also need Prokka and Roary installed on your system and in your $PATH. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
+6. You will also need Prokka and Roary installed on your system and in your $PATH. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
 
 
 <p align="right">(<a href="#installation-top">back to top</a>)</p>
@@ -69,11 +76,11 @@ The following workflows perform specific functions only; no primer and gRNA desi
 
 The following workflows are available for primer and gRNA design:
 
-1. `ncbi_all_subsample` - download target and non-target genomes from NCBI; run subsampling of target genomes
+1. `ncbi_all_subsample` - download target and non-target genomes from NCBI; subsample target genomes
 2. `ncbi_all_nosubsample` - download target and non-target genomes from NCBI; use all target genomes
-3. `user_target_subsample` - user-provided target genomes; download non-target genomes from NCBI; run subsampling of target genomes
+3. `user_target_subsample` - user-provided target genomes; download non-target genomes from NCBI; subsample target genomes
 4. `user_target_nosubsample` - user-provided target genomes; download non-target genomes from NCBI; use all target genomes
-5. `user_all_subsample` - user-provided target and non-target genomes; run subsampling of target genomes
+5. `user_all_subsample` - user-provided target and non-target genomes; subsample target genomes
 6. `user_all_nosubsample` - user-provided target and non-target genomes; use all target genomes
 
 
