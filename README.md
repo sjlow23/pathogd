@@ -191,7 +191,7 @@ If your target or non-target taxa includes multiple species, *eg.* all species b
 
 ### B. Download genomes for target and/or non-target taxa of interest using the `download_target` or `download_nontarget` workflow
 
-Use this to automatically download genome assemblies for target and/or non-target taxa by specifying their species names/taxids in the config file. Similar to the `check` workflow, this workflow only works if your target and non-target taxa consist of distinct species.
+Use this to automatically download genome assemblies for target and/or non-target taxa by specifying their species names/taxids in the config file. Similar to the `check` workflow, this workflow only works if your target and non-target taxa consist of distinct species. Similar to the `check` workflow, you can specify an NCBI taxid at a higher taxonomic rank, and all children taxa will be downloaded.
 
    _Download target genomes_
 
