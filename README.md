@@ -105,9 +105,9 @@ The following workflows are available for primer and gRNA design:
 <a name="config-top"></a>
 ## Configuration file
 
-The configuration file is specified using the `-c` parameter in the `pathogd` command, and is mandatory for running PathoGD. This file is used for specifying most of the parameters and options for running the pipeline, including target and non-target organisms. A template of the file is provided (`config.txt`) above. 
+The configuration file is specified using the `-c` parameter in the `pathogd` command, and is mandatory for running PathoGD. This file is used for specifying most of the parameters and options for running the pipeline, including target and non-target organisms. A template of the file is provided (`config.txt`) above for `Mycoplasmoides genitalium`. 
 
-Do not modify the file other than to include your specifications. Input specifications after the `|` sign. The following table defines which fields need to be completed for running the PathoGD pipeline. Asterisks indicate fields that are optional, but would be good to include for logging purposes. These do not have to be accurate as they are not explicitly used for running the pipeline.
+Do not modify the file other than to include your specifications. Input your specifications after the `|` sign. The following table defines which fields need to be completed for running the PathoGD pipeline. Asterisks indicate fields that are optional, but would be good to include for logging purposes. These do not have to be accurate as they are not explicitly used for running the pipeline.
 
 
 | **Parameter/Workflow** | **check** | **download_target** | **download_nontarget** | **ncbi_all_subsample**     | **ncbi_all_nosubsample**   | **user_target_subsample**  | **user_target_nosubsample** | **user_all_subsample**     | **user_all_nosubsample**   |
