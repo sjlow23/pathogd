@@ -217,7 +217,9 @@ Use this to automatically download genome assemblies for target and/or non-targe
 
    2. To prevent this, use the `check` workflow.
 
-   3. If both species name and species taxids are provided in the config file, only the **species taxids** will be used for downloading genome assemblies.
+   3. If the taxid of a \"genus\" or higher taxonomic rank was specified for the non-target taxa in the config file (and target species is in same parent taxa), downloaded genomes will include target species. However, they will be identified and removed when the `ncbi_*` or `user_*` workflows are run.
+
+   4. If both species name and species taxids are provided in the config file, only the **species taxids** will be used for downloading genome assemblies.
 
 
 <p align="right">(<a href="#usage-top">back to top</a>)</p>
@@ -288,7 +290,7 @@ For the `ncbi_*` and `user_*` workflows with primer and gRNA design, the most re
 | primer_set                        | Primer set id for a given guide RNA id (maximum of 5 sets per gRNA; name not unique)                                                          |
 | fwd_primer                        | Forward primer sequence                                                                                                                       |
 | rev_primer                        | Reverse primer sequence                                                                                                                       |
-| primer_cas13a_compatibility       | Compatibility of primers with Cas13a (if 'yes', can use as is; if 'swap primers', swap forward and reverse primers). A T7 RNA polymerase promoter sequence is added on the 5' end of the forward primer for T7 transcription.                         |
+| primer_cas13a_compatibility       | Compatibility of primers with Cas13a for RNA detection (if 'yes', can use as is; if 'swap primers', swap forward and reverse primers). The T7 RNA polymerase promoter sequence should be prepended on the 5' end of the forward primer for T7 transcription.                         |
 | fwd_primer_length                 | Length of forward primer                                                                                                                      |
 | rev_primer_length                 | Length of reverse primer                                                                                                                      |
 | guide_length                      | Length of guide RNA                                                                                                                           |
@@ -318,4 +320,4 @@ For the `ncbi_*` and `user_*` workflows with primer and gRNA design, the most re
 
 ## Citation
 
-If you use this tool in your research, please cite https://github.com/sjlow23/pathogd.
+The manuscript for PathoGD is currently under preparation. If you use this tool in your research, please cite https://github.com/sjlow23/pathogd.
