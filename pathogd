@@ -1,5 +1,10 @@
 #!/bin/bash
 
+set -e
+set -u
+set -o pipefail
+
+
 usage() {
 	echo -e "\nUsage:"
 	echo -e "  $0 [-c <config file>] [-m <method (optional)>] [-w <workflow>] [-o <output directory>] [-r <reference genbank file (optional)>] [-t <number of cpus (default 8)>]\n"
@@ -337,7 +342,7 @@ download_target_genomes() {
 
 	if [[ $db == "genbank" ]] || [[ $db == "refseq" ]] 
 	then
-		if [[ -n $target_taxid ]]
+		if [[ -n "$target_taxid" ]]
 		then
 			taxonkit list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
 
@@ -373,7 +378,7 @@ download_target_genomes() {
 	elif [[ $db == "both" ]]
 	then
 		no_genomes=0
-		if [[ -n $target_taxid ]]
+		if [[ -n "$target_taxid" ]]
 		then
 			taxonkit list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
 			
@@ -454,7 +459,7 @@ download_nontarget_genomes() {
 
 	if [[ $db == "genbank" ]] || [[ $db == "refseq" ]] 
 	then
-		if [[ -n $offtarget_taxid ]]
+		if [[ -n "$offtarget_taxid" ]]
 		then
 			taxonkit list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 
@@ -490,7 +495,7 @@ download_nontarget_genomes() {
 
 	elif [[ $db == "both" ]]
 	then
-		if [[ -n $offtarget_taxid ]]
+		if [[ -n "$offtarget_taxid" ]]
 		then
 			taxonkit list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 			no_genomes=0
