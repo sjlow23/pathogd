@@ -9,7 +9,7 @@ PathoGD is a bioinformatic pipeline for the rapid and high-throughput design of 
 
 The increasing availability of bacterial draft and whole-genome sequences provide an opportunity to identify alternative diagnostic markers from previously unexplored genomic regions. PathoGD was developed to facilitate the design of highly specific RPA primers and gRNAs for CRISPR-Cas12a-based pathogen detection. It provides a streamlined workflow to accelerate the *in silico* aspect of a CRISPR-Cas12a assay design. 
 
-PathoGD incorporates multiple bioinformatics tools for performing the individual steps in the pipeline. It requires two databases- target and non-target- containing the genomes of the pathogen to be detected and closely-related organisms potentially resulting in cross-reactivity, respectively, for the selection of a highly-specific target region to be amplified.
+PathoGD incorporates multiple bioinformatics tools for performing the individual steps in the pipeline. It requires two databases- target and non-target- containing the genomes of the pathogen to be detected and closely-related organisms potentially resulting in cross-reactivity, respectively, for the selection of a highly-specific target region to be amplified. These genomes can either be automatically downloaded by PathoGD or provided by the user.
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
