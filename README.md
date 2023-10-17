@@ -276,42 +276,62 @@ Examples using *Mycoplasmoides genitalium* for either pangenome or *k*-mer modul
 <p align="right">(<a href="#usage-top">back to top</a>)</p>
 
 
+## D. Design guide RNAs only using *k*-mer module
+
+When using the *k*-mer module, the primer design step is optional. This results in a potentially larger pool of guide RNAs as the flanking sequences are not required to be conserved.
+To exclude the primer design step, modify the config file so that the `primer_design` field is set to `no`.
+
+The output file is `uniq_target_kmers_final_prevalence.tsv` under the `kmers_results` directory. It includes the following information:
+
+| **Field**               | **Remarks**                                                     |
+|-------------------------|-----------------------------------------------------------------|
+| guide                   | Guide RNA id                                                    |
+| actual_pam              | Protospacer adjacent motif (sequence upstream of gRNA)          |
+| guide_sequence_to_order | Guide RNA sequence (5' --> 3')                                  |
+| count_genomes_present   | Number of genomes with gRNA sequence                            |
+| sum_across_genomes      | Total number of gRNA sequences across all target genomes        |
+| avg_copy_number         | Average copy number of gRNA sequences across all target genomes |
+| perc_total              | Percentage of genomes with gRNA sequence                        |
+
+
+
+
 ## Output
 
 For the `ncbi_*` and `user_*` workflows with primer and gRNA design, the most relevant output is a tab-delimited file `pathogd_primers_stats.tsv` containing information on all the primers and gRNAs that were designed. The table below explains the contents of each field:
 
-| **Field**                         | **Remarks**                                                                                                                                   |
-|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| guide_set                         | Guide RNA id                                                                                                                                  |
-| guide_seq                         | Guide RNA sequence                                                                                                                            |
-| pam                               | Protospacer adjacent motif (sequence upstream of gRNA)                                                                                        |
-| gene                              | Gene id                                                                                                                                       |
-| gene_annotation                   | Gene name                                                                                                                                     |
-| primer_set                        | Primer set id for a given guide RNA id (maximum of 5 sets per gRNA; name not unique)                                                          |
-| fwd_primer                        | Forward primer sequence                                                                                                                       |
-| rev_primer                        | Reverse primer sequence                                                                                                                       |
-| primer_cas13a_compatibility       | Compatibility of primers with Cas13a for RNA detection (if 'yes', can use as is; if 'swap primers', swap forward and reverse primers). The T7 RNA polymerase promoter sequence should be prepended on the 5' end of the forward primer for T7 transcription.                         |
-| fwd_primer_length                 | Length of forward primer                                                                                                                      |
-| rev_primer_length                 | Length of reverse primer                                                                                                                      |
-| guide_length                      | Length of guide RNA                                                                                                                           |
-| fwd_primer_gc                     | Forward primer GC content                                                                                                                     |
-| rev_primer_gc                     | Reverse primer GC content                                                                                                                     |
-| guide_gc                          | Guide RNA GC content                                                                                                                          |
-| product_size                      | Amplicon size (based on consensus sequence)                                                                                                   |
-| primerset_new                     | Unique primer set id (based on combination of primer and gRNA sequence; should occur only once)                                             |
-| primerset_uniq                    | Primer set id (based on forward and reverse primer sequence; can occur more than once if multiple gRNAs are compatible with the primer set) |
-| primer_target_prevalence_0mm      | Percentage of target genomes with perfect matches to primer sequence                                                                          |
-| primer_target_prevalence_2mm      | Percentage of target genomes with up to 2 mismatches to primer sequence                                                                       |
-| avg_amplicon_num_target           | Average number of amplicons in target genomes                                                                                                 |
-| avg_amplicon_length_target        | Average amplicon size in target genomes                                                                                                       |
-| primer_nontarget_prevalence_0mm   | Percentage of non-target genomes with perfect matches to primer sequence                                                                      |
-| primer_nontarget_prevalence_2mm   | Percentage of non-target genomes with up to 2 mismatches to primer sequence                                                                   |
-| primer_nontarget_prevalence_8mm   | Percentage of non-target genomes with up to 8 mismatches to primer sequence                                                                   |
-| avg_amplicon_num_nontarget        | Average number of amplicons in non-target genomes                                                                                             |
-| avg_amplicon_length_nontarget     | Average amplicon size in non-target genomes                                                                                                   |
-| guide_average_copy_number_target  | Average number of guide RNAs in target genomes                                                                                                |
-| guide_target_prevalence           | Percentage of target genomes with perfect matches to guide RNA sequence                                                                       |
-| guide_offtarget_prevalence_max5mm | Percentage of non-target genomes with 3≤n≤5 mismatches to guide RNA sequence                                                                  |
+| **Field**                         | **Remarks**                                                                                                                                                                                                                                               |
+|-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| guide_set                         | Guide RNA id                                                                                                                                                                                                                                              |
+| guide_seq                         | Guide RNA sequence (5' --> 3')                                                                                                                                                                                                                            |
+| pam                               | Protospacer adjacent motif (sequence upstream of gRNA)                                                                                                                                                                                                    |
+| gene                              | Gene id                                                                                                                                                                                                                                                   |
+| gene_annotation                   | Gene name                                                                                                                                                                                                                                                 |
+| primer_set                        | Primer set id for a given guide RNA id (maximum of 5 sets per gRNA; name   not unique)                                                                                                                                                                    |
+| fwd_primer                        | Forward primer sequence                                                                                                                                                                                                                                   |
+| rev_primer                        | Reverse primer sequence                                                                                                                                                                                                                                   |
+| primer_cas13a_compatibility       | Compatibility of primers with Cas13a for RNA detection (if 'yes', can use   as is; if 'swap primers', swap forward and reverse primers). A T7 RNA   polymerase promoter sequence is prepended on the 5' end of the forward primer   for T7 transcription. |
+| fwd_primer_length                 | Length of forward primer                                                                                                                                                                                                                                  |
+| rev_primer_length                 | Length of reverse primer                                                                                                                                                                                                                                  |
+| guide_length                      | Length of guide RNA                                                                                                                                                                                                                                       |
+| fwd_primer_gc                     | Forward primer GC content                                                                                                                                                                                                                                 |
+| rev_primer_gc                     | Reverse primer GC content                                                                                                                                                                                                                                 |
+| guide_gc                          | Guide RNA GC content                                                                                                                                                                                                                                      |
+| product_size                      | Amplicon size (based on consensus sequence)                                                                                                                                                                                                               |
+| primerset_new                     | Unique primer set id (based on combination of primer and gRNA sequence;   should occur only once)                                                                                                                                                         |
+| primerset_uniq                    | Primer set id (based on forward and reverse primer sequence; can occur   more than once if multiple gRNAs are compatible with the primer set)                                                                                                             |
+| primer_target_prevalence_0mm      | Percentage of target genomes with perfect matches to primer sequence                                                                                                                                                                                      |
+| primer_target_prevalence_2mm      | Percentage of target genomes with up to 2 mismatches to primer sequence                                                                                                                                                                                   |
+| avg_amplicon_num_target           | Average number of amplicons in target genomes                                                                                                                                                                                                             |
+| avg_amplicon_length_target        | Average amplicon size in target genomes                                                                                                                                                                                                                   |
+| primer_nontarget_prevalence_0mm   | Percentage of non-target genomes with perfect matches to primer sequence                                                                                                                                                                                  |
+| primer_nontarget_prevalence_2mm   | Percentage of non-target genomes with up to 2 mismatches to primer   sequence                                                                                                                                                                             |
+| primer_nontarget_prevalence_8mm   | Percentage of non-target genomes with up to 8 mismatches to primer   sequence                                                                                                                                                                             |
+| avg_amplicon_num_nontarget        | Average number of amplicons in non-target genomes                                                                                                                                                                                                         |
+| avg_amplicon_length_nontarget     | Average amplicon size in non-target genomes                                                                                                                                                                                                               |
+| guide_average_copy_number_target  | Average number of guide RNAs in target genomes                                                                                                                                                                                                            |
+| guide_target_prevalence           | Percentage of target genomes with perfect matches to guide RNA sequence                                                                                                                                                                                   |
+| guide_offtarget_prevalence_max5mm | Percentage of non-target genomes with 3≤n≤5 mismatches to guide RNA   sequence                                                                                                                                                                            |
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
