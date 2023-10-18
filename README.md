@@ -2,7 +2,7 @@
 <a name="readme-top"></a>
 ## About PathoGD
 
-PathoGD is a bioinformatic pipeline for the rapid and high-throughput design of RPA primers and guide RNAs (gRNA) for CRISPR-Cas12a-based nucleic acid detection. It incorporates two complementary modules- pangenome and *k*-mer- targeting the protein-coding and whole genome, respectively, for selection of a target region and subsequent guide RNA and primer design. PathoGD was initially developed for and tested on bacterial pathogens, but should work on any organism whose genome sequences are available.
+PathoGD is a bioinformatic pipeline for the rapid and high-throughput design of RPA primers and guide RNAs (gRNA) for CRISPR-Cas12a-based nucleic acid detection. It incorporates two complementary modules- pangenome and *k*-mer- targeting the protein-coding and whole genome, respectively, for selection of a target region and subsequent guide RNA and primer design. PathoGD was initially developed for and tested on bacterial genomes, but should work on any organism whose genome sequences are available.
 
 
 ## Introduction
@@ -10,6 +10,8 @@ PathoGD is a bioinformatic pipeline for the rapid and high-throughput design of 
 The increasing availability of bacterial draft and whole-genome sequences provide an opportunity to identify alternative diagnostic markers from previously unexplored genomic regions. PathoGD was developed to facilitate the design of highly specific RPA primers and gRNAs for CRISPR-Cas12a-based pathogen detection. It provides a streamlined workflow to accelerate the *in silico* aspect of a CRISPR-Cas12a assay design. 
 
 PathoGD incorporates multiple bioinformatics tools for performing the individual steps in the pipeline. It requires two databases- target and non-target- containing the genomes of the pathogen to be detected and closely-related organisms potentially resulting in cross-reactivity, respectively, for the selection of a highly-specific target region to be amplified. These genomes can either be automatically downloaded by PathoGD or provided by the user.
+
+PathoGD will design guide RNAs that are specific to the target taxa, with at least 3 mismatches to non-target taxa and the human genome. The output file contains information which can be used for filtering to a smaller set of candidates for validation.
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
