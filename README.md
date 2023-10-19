@@ -253,6 +253,11 @@ Examples using *Mycoplasmoides genitalium* for either pangenome or *k*-mer modul
    pathogd -c config.txt -m pangenome -w ncbi_all_subsample -o pathogd_output
    ```
 
+The following examples are for cases where genomes are provided by the user.
+
+To use these workflows, you must first create the output directory, *e.g.* `pathogd_output`, and the sub-directories `genomes_target` and `genomes_offtarget`.
+
+Deposit your target and non-target genomes into their respective directories. The genome file names should have the following format: `"ABCDE_genomic.fna"` or `"ABCDE_genomic.fna.gz"`, where ABCDE is the unique name of the genome.
 
    **c) Provide own target and non-target genomes, no subsampling of target genomes**
    
