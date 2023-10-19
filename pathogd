@@ -142,7 +142,7 @@ done < "$OUTPUT"/params.tsv
 
 kmerpam=$((kmer + 4))
 
-logger "Your target species is '$target'"
+logger "Your target species is '"$target"'"
 logger "Your output directory is: '"$OUTPUT"'"
 logger "Using "$CPU_CORES" threads"
 
