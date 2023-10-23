@@ -1,0 +1,7 @@
+name: pathogd-roary
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - roary=3.13

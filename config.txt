@@ -74,9 +74,9 @@ subsample|20
 
 
 ## Prokka conda environment
-prokka_env|prokka-1.14.6
+prokka_env|pathogd-prokka
 
 
 ## Roary conda environment
-roary_env|roary-3.13.0
+roary_env|pathogd-roary
 

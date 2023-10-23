@@ -1,0 +1,7 @@
+name: pathogd-prokka
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - prokka=1.14.6
