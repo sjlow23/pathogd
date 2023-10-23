@@ -18,7 +18,7 @@ target_species|Mycoplasmoides genitalium
 ## Target species NCBI taxonomy id(s)
 ## Only use taxids defined at the species level
 ## Can be multiple- separate taxids by comma without space
-target_species_taxid|2097
+target_taxid|2097
 
 
 ## Offtarget species name
@@ -30,7 +30,7 @@ offtarget_species|Mycoplasmoides pneumoniae,Ureaplasma urealyticum
 ## Offtarget species NCBI taxonomy taxid(s)
 ## Only use taxids defined at the species level
 ## Can be multiple- separate taxids by comma without space
-offtarget_species_taxid|2104,2130
+offtarget_taxid|2104,2130
 
 
 ## Domain of organism
