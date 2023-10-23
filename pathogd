@@ -115,8 +115,8 @@ PRIMERS=$OUTPUT/primers
 LOG=$OUTPUT/pathogd.log
 DATABASE=$MYDIR/database
 
-# Previous statement failed when executing without `-t`
-if [[ ! -z "$CPU" ]]; then
+# Unbound variable when executing without `-t`
+if [[ ! -z "${CPU+x}" ]]; then
 	CPU_CORES="$CPU"
 else
 	CPU_CORES=$(nproc)
