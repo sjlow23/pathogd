@@ -21,7 +21,8 @@ dependencies:
   - seqkit=2.3.1
   - taxonkit=0.15.0
   - wget
-
+  
+  - r-argparse=1.0.1
   - r-base=4.2.0
   - r-cli=3.3.0
   - r-cpp11=0.4.3
