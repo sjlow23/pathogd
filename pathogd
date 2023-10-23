@@ -1,8 +1,9 @@
 #!/bin/bash
 
-set -e
-set -u
-set -o pipefail
+# set -e
+# set -u
+# set -o pipefail
+# set -x
 
 
 usage() {
@@ -142,7 +143,8 @@ done < "$OUTPUT"/params.tsv
 
 kmerpam=$((kmer + 4))
 
-logger "Your target species is '"$target"'"
+( [[ -n "${target_species:-}" ]] && logger "Your target species is '$target_species'" ) || ( [[ -n "${target_taxid:-}" ]] && logger "Your target species taxid is '$target_taxid'" ) || logger "Target is not defined"
+#logger "Your target species is '$target'"
 logger "Your output directory is: '"$OUTPUT"'"
 logger "Using "$CPU_CORES" threads"
 
@@ -166,7 +168,7 @@ check_assemblies_taxid() {
 	# Run wget script within those directories to download subsampled genomes
 
 	cd "$OUTPUT"
-	logger "Checking number of genome assemblies available for '$target'" 
+	logger "Checking number of genome assemblies available for '$target_species'" 
 
 	if [[ "$domain" == "bacteria" ]]
 	then
@@ -192,28 +194,9 @@ check_assemblies_taxid() {
 		# Get all children species taxids under user-provided parent taxids
 		taxonkit list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
 		taxonkit list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
-	else
-		target_genbank=$(grep -w "$target" genbank.txt | wc -l)
-		target_refseq=$(grep -w "$target" refseq.txt | wc -l)
-		nontarget_genbank=$(grep -w "$offtarget" genbank.txt | wc -l)
-		nontarget_refseq=$(grep -w "$offtarget" refseq.txt | wc -l)
-
-		logger ""$target_genbank" GenBank assemblies found for '$target'"
-		logger ""$target_refseq" RefSeq assemblies found for '$target'"
-		logger ""$nontarget_genbank" GenBank assemblies found for '$offtarget'"
-		logger ""$nontarget_refseq" RefSeq assemblies found for '$offtarget'"
 	fi
 
-
-	# target_genbank=$(awk 'FNR==NR { a[$1]; next } ($7 in a)' target_sptaxids.txt genbank.txt | wc -l)
-	# target_refseq=$(awk 'FNR==NR { a[$1]; next } ($7 in a)' target_sptaxids.txt refseq.txt | wc -l)
-	# nontarget_genbank=$(awk 'FNR==NR { a[$1]; next } ($7 in a)' nontarget_sptaxids.txt genbank.txt | wc -l)
-	# nontarget_refseq=$(awk 'FNR==NR { a[$1]; next } ($7 in a)' nontarget_sptaxids.txt refseq.txt | wc -l)
-
-	# Subset assembly file for subsampling
-	logger "Subsampling to a maximum of 1000 target genomes and 100 genomes per non-target species"
-
-	# Subsample if more than 1000 target genomes
+	# Subsample where necessary and generate download script
 	for db in genbank refseq; do
 
 		if [ $db == "genbank" ]; then
@@ -223,21 +206,23 @@ check_assemblies_taxid() {
 		fi
 
 		# Target genomes
-		mkdir "$db"
+		mkdir -p "$db"
 		cd "$db"
 
 		# If using taxids
-		if [[ -n "target_taxid" ]]; then
+		if [[ -n "$target_taxid" ]]; then
 			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/target_sptaxids.txt "$OUTPUT"/"$db".txt > target_"$db".txt
 			rm "$OUTPUT"/target_sptaxids.txt
 		# If using species name
 		else
-			if [[ "$target" == *,* ]]; then
-				target_array=(${target//,/ })
-				target_taxa=$(echo "${target_array[*]}" | tr ' ' '|')
+			# if multiple species present
+			if [[ "$target_species" == *,* ]]; then
+				#target_array=(${target//,/ })
+				#target_taxa=$(echo "${target_array[*]}" | tr ' ' '|')
+				target_taxa=$(echo "target_taxa" | sed 's/,/|/g')
 				egrep -w "$target_taxa" "$OUTPUT"/"$db".txt > target_"$db".txt
 			else
-				grep -w "$target" "$OUTPUT"/"$db".txt > target_"$db".txt
+				grep -w "$target_species" "$OUTPUT"/"$db".txt > target_"$db".txt
 			fi
 		fi
 	
@@ -250,6 +235,7 @@ check_assemblies_taxid() {
 
 		if [[ -s sample.txt && -s keep.txt ]]
 		then
+			logger "Subsampling to a maximum of 1000 target genomes per target species"
 			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -v id={} '\$7 == id {print}' target_"$db".txt | shuf -n 1000" | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' > wget_target_"$db".sh
 			
@@ -260,6 +246,7 @@ check_assemblies_taxid() {
 
 		elif [[ -s sample.txt && ! -s keep.txt ]]
 		then
+			logger "Subsampling to a maximum of 1000 target genomes per target species"
 			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -v id={} '\$7 == id {print}' target_"$db".txt | shuf -n 1000" | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' > wget_target_"$db".sh
 			rm sample.txt
@@ -280,8 +267,9 @@ check_assemblies_taxid() {
 		# if using species name
 		else
 			if [[ "$offtarget" == *,* ]]; then
-				offtarget_array=(${offtarget//,/ })
-				offtarget_taxa=$(echo "${offtarget_array[*]}" | tr ' ' '|')
+				#offtarget_array=(${offtarget//,/ })
+				#offtarget_taxa=$(echo "${offtarget_array[*]}" | tr ' ' '|')
+				offtarget_taxa=$(echo "offtarget_taxa" | sed 's/,/|/g')
 				egrep -w "$offtarget_taxa" "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
 			else
 				grep -w "$offtarget" "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
@@ -305,7 +293,7 @@ check_assemblies_taxid() {
 		then
 			#awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' sample.txt offtarget_"$db".txt | shuf -n 100 > offtarget_"$db"_subsampled.txt
 			#awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt offtarget_"$db".txt >> offtarget_"$db"_subsampled.txt
-
+			logger "Subsampling to a maximum of 100 genomes per non-target species"
 			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -v id={} '\$7 == id {print}' offtarget_"$db".txt | shuf -n 100" | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' > wget_offtarget_"$db".sh
 
@@ -315,6 +303,7 @@ check_assemblies_taxid() {
 
 		elif [[ -s sample.txt && ! -s keep.txt ]]
 		then
+			logger "Subsampling to a maximum of 100 genomes per non-target species"
 			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -v id={} '\$7 == id {print}' offtarget_"$db".txt | shuf -n 100" | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' > wget_offtarget_"$db".sh
 			rm sample.txt
@@ -611,7 +600,7 @@ decompress_genomes() {
 		
 		## Handle NCBI assembly format names differently
 		local new=($(printf '%s\n' "${ori[@]}" | awk -F "_" '{ if ($0 ~ /^GC/) print $1"_"$2"_genomic.fna"; else print $0 }'))
-		for i in "${!ori[@]}"; do mv -n "${ori[i]}" "${new[i]}"; done
+		for i in "${!ori[@]}"; do if [[ "${ori[i]}" != "${new[i]}" ]]; then mv -n "${ori[i]}" "${new[i]}"; fi; done
 
 		find . -maxdepth 1 \( -type f -o -type l \) -name "*.fna" -exec basename {} _genomic.fna \; > $OUTPUT/genomes_target.txt
 		cd $OUTPUT
@@ -630,7 +619,7 @@ decompress_genomes() {
 		local ori=($(ls -d *.fna))
 		local new=($(printf '%s\n' "${ori[@]}" | awk -F "_" '{ if ($0 ~ /^GC/) print $1"_"$2"_genomic.fna"; else print $0 }'))
 		#local new=($(ls -d *.fna | awk -F "_" '{ print $1"_"$2"_genomic.fna" }'))
-		for i in "${!ori[@]}"; do mv -n "${ori[i]}" "${new[i]}"; done
+		for i in "${!ori[@]}"; do if [[ "${ori[i]}" != "${new[i]}" ]]; then mv -n "${ori[i]}" "${new[i]}"; fi; done
 
 		find . -maxdepth 1 \( -type f -o -type l \) -name "*.fna" -exec basename {} _genomic.fna \; > $OUTPUT/genomes_offtarget.txt
 		cd $OUTPUT
@@ -657,7 +646,7 @@ prepare_human_genome() {
 	
 	if [[ -s GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list && -s GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list ]]
 	then
-		logger "k-mer lists for human genome for selected k previously generated"
+		logger "k-mer lists for human genome for selected 'k' previously generated"
 	elif [[ ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list && ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list ]]
 	then
 		logger "Counting k=$kmer and k=$kmerpam in human genome"
@@ -718,11 +707,12 @@ get_pangenome() {
 	fi
 
 	# If conda environment name provided
-	if [[ -n "$prokka_env" ]] 
+	set +u
+	if [[ -n "${prokka_env:-}" ]] 
 	then
 		conda activate $prokka_env
 	fi
-	
+
 	if [[ "$ref_annot" == "yes" ]]
 	then
 		if [[ "$(ls -A prokka)" ]]
@@ -733,7 +723,7 @@ get_pangenome() {
 			#cp $MYDIR/$REF prokka/
 			#local ref=$(basename "$MYDIR"/"$REF")
 			prodigal -i $MYDIR/$REF -t prokka/ref.trn
-
+			
 			#conda activate prokka-1.14.6
 		
 			cat $myfile | \
@@ -758,15 +748,22 @@ get_pangenome() {
 
 	conda deactivate
 
-	logger "Estimating pangenome for '$target'"
+	logger "Estimating pangenome for '$target_species'"
 
-	if [[ -n "$roary_env" ]]
+	if [[ -n "${roary_env:-}" ]]
 	then
 		conda activate $roary_env
 	fi
 
-	roary -cd 90 -s -z --mafft -p "$MAX_JOBS" -f roary prokka/*_out/*.gff
+	if [[ -s roary/gene_presence_absence.csv ]]
+	then
+		logger "Roary run previously completed"
+	else
+		roary -cd 90 -s -z --mafft -p "$MAX_JOBS" -f roary prokka/*_out/*.gff
+	fi
+	
 	conda deactivate
+	set +u
 
 	## Get list of conserved genes (at least 90% prevalence)]
 	if [[ "$subsample" == "no" ]]
@@ -816,7 +813,7 @@ species_specific_genes() {
 		counter=$((counter + 1))
 		echo "$genome" | \
 		tr " " "\n" | \
-		parallel -j "$MAX_JOBS" 'prodigal -a prodigal_nontarget/"{}".faa -q -c -m -p single -f sco -o prodigal_nontarget/tmp -q -i '"$GENOMES_OFFTARGET"'/"{}"_genomic.fna'
+		parallel -j "$MAX_JOBS" 'prodigal -a prodigal_nontarget/"{}".faa -q -c -m -f sco -p meta -o prodigal_nontarget/tmp -q -i '"$GENOMES_OFFTARGET"'/"{}"_genomic.fna'
 
 		cat prodigal_nontarget/*.faa > prodigal_nontarget/combined_batches/batch_"$counter".faa
 		[[ -s prodigal_nontarget/combined_batches/batch_"$counter".faa ]] && rm prodigal_nontarget/*.faa
@@ -912,7 +909,7 @@ align_species_specific() {
 
 	rm -rf species_specific
 
-	mkdir gene_alignments
+	mkdir -p gene_alignments
 	
 	while read gene
 	do
@@ -922,7 +919,7 @@ align_species_specific() {
 		rm gene_alignments/"$newgene"_ids.txt
 	done < conserved90pct_genes_specific.txt
 
-	logger "Aligning core species-specific genes for '$target'"
+	logger "Aligning core species-specific genes"
 	cat conserved90pct_genes_specific.txt | \
 	parallel -j "$MAX_PARALLEL_JOBS" 'mafft --auto --thread '"$MAX_THREADS_PER_JOB"' gene_alignments/"{}".fna > gene_alignments/"{}".aln; \
 	cons -sequence gene_alignments/"{}".aln -name "{}" -outseq gene_alignments/"{}".cons;
@@ -944,7 +941,7 @@ get_guides_pam() {
 
 	logger "Identifying PAM sites in genes"
 	cd $PANGENOME
-	mkdir templates
+	mkdir -p templates
 
 	## Define canonical PAM sites
 	local pam1="AAAA"
@@ -956,6 +953,7 @@ get_guides_pam() {
 	local pam7="TTTG"
 	local pam8="TTTT"
 
+	#set +e
 	while read gene
 	do
 		#awk '/^>/{if(N)exit;++N;} {print;}' 
@@ -965,82 +963,101 @@ get_guides_pam() {
 		## Search for PAM sites on reverse strand
 		for i in $pam1 $pam2 $pam3 $pam4
 		do
-			grep -v ">" templates/"$gene".template | 
-			# count positions excluding header
-			grep -aob "$i" | 
-			grep -oE '[0-9]+' | 
-			awk '{ print $1-"'$kmer'"+1, $1 }' | 
-	                ## Add set number for gene-pam combinations
-	                awk '$1>=50 {print "'$gene'", $1"-"$2, "'$i'", "'$gene'--'$i'" }' OFS="\t" | 
-	                awk -F "\t" 'BEGIN {prev=0; count=1} {if (prev==$NF) count++; else {count=1;; prev=$NF } print $0, "gset"count"r" }' OFS="\t" | 
-	                sed 's/\t/-/4' | 
-	                sed 's/--AAAA/--TTTT/; s/--CAAA/--TTTG/; s/--GAAA/--TTTC/; s/--TAAA/--TTTA/1' | 
-	                awk -F "\t" '{ if ($3=="AAAA") $3="TTTT";
-	                else if ($3=="CAAA") $3="TTTG";
-	                else if ($3=="GAAA") $3="TTTC";
-	        else if ($3=="TAAA") $3="TTTA"; print $0 }' OFS="\t" >> templates/"$gene".positions
+			pam_found=false
+			positions=$(grep -v ">" templates/"$gene".template | grep -aob "$i" | grep -oE '[0-9]+' | wc -l)
+    
+		    # Check if positions are empty
+		    if [[ "$positions" -eq 0 ]]; then
+		    	continue
+		    else
+		    	pam_found=true
+		    	
+				grep -v ">" templates/"$gene".template | 
+				# count positions excluding header
+				grep -aob "$i" | 
+				grep -oE '[0-9]+' | 
+				awk '{ print $1-"'$kmer'"+1, $1 }' | 
+				## Add set number for gene-pam combinations
+				awk '$1>=50 {print "'$gene'", $1"-"$2, "'$i'", "'$gene'--'$i'" }' OFS="\t" | 
+				awk -F "\t" 'BEGIN {prev=0; count=1} {if (prev==$NF) count++; else {count=1;; prev=$NF } print $0, "gset"count"r" }' OFS="\t" | 
+				sed 's/\t/-/4' | 
+				sed 's/--AAAA/--TTTT/; s/--CAAA/--TTTG/; s/--GAAA/--TTTC/; s/--TAAA/--TTTA/1' | 
+				awk -F "\t" '{ if ($3=="AAAA") $3="TTTT";
+				else if ($3=="CAAA") $3="TTTG";
+				else if ($3=="GAAA") $3="TTTC";
+				else if ($3=="TAAA") $3="TTTA"; print $0 }' OFS="\t" >> templates/"$gene".positions
+			fi
+		done
 
-	        done
+		## Search for PAM sites on forward strand
+		for i in $pam5 $pam6 $pam7 $pam8
+		do
+			pam_found=false
+			# Get length of gene
+			genelength=$(($(grep -v ">" templates/"$gene".template | wc -m) - 1))
+			
+			positions=$(grep -v ">" templates/"$gene".template | grep -aob "$i" | grep -oE '[0-9]+' | wc -l)
+    
+		    # Check if positions are empty
+		    if [[ "$positions" -eq 0 ]]; then
+		        continue
+		    else
+		    	pam_found=true
+		    	
+				grep -v ">" templates/"$gene".template | 
+				grep -aob "$i" | 
+				grep -oE '[0-9]+' | 
+				awk '{ print $1+5, $1+"'$kmer'"+5-1 }' | 
+				## discard if exceeds gene length
+				awk '$2<='"$genelength"'' |
+				## Add set number for gene-pam combinations
+				awk '$1>=50 {print "'$gene'", $1"-"$2, "'$i'", "'$gene'--'$i'" }' OFS="\t" | \
+				awk -F "\t" 'BEGIN {prev=0; count=1} {if (prev==$NF) count++; else {count=1;; prev=$NF } print $0, "gset"count"f" }' OFS="\t" | \
+				sed 's/\t/-/4' >> templates/"$gene".positions
+			fi
+		done
 
-              	## Search for PAM sites on forward strand
-              	for i in $pam5 $pam6 $pam7 $pam8
-              	do
-               		# Get length of gene
-               		genelength=$(($(grep -v ">" templates/"$gene".template | wc -m) - 1))
-               		
-               		grep -v ">" templates/"$gene".template | 
-               		grep -aob "$i" | 
-               		grep -oE '[0-9]+' | 
-               		awk '{ print $1+5, $1+"'$kmer'"+5-1 }' | 
-	                ## discard if exceeds gene length
-	                awk '$2<='"$genelength"'' |
-	                ## Add set number for gene-pam combinations
-	                awk '$1>=50 {print "'$gene'", $1"-"$2, "'$i'", "'$gene'--'$i'" }' OFS="\t" | \
-	                awk -F "\t" 'BEGIN {prev=0; count=1} {if (prev==$NF) count++; else {count=1;; prev=$NF } print $0, "gset"count"f" }' OFS="\t" | \
-	                sed 's/\t/-/4' >> templates/"$gene".positions
-	        done
 
-
-	        if [[ -s templates/"$gene".positions ]]
-	        then
+		if [[ -s templates/"$gene".positions ]]
+		then
 			##coordinates for seqkit
 			awk '{ print $1, $2, $4, "1", "+" }' OFS="\t" templates/"$gene".positions | sed 's/-/\t/1' >> templates/"$gene".coords.bed
 
-	                ## extract to tab-delimited format directly
-	                seqkit subseq -j "$MAX_JOBS" --bed templates/"$gene".coords.bed --up-stream 150 --down-stream 150 templates/"$gene".template >> templates/"$gene"_templates.fasta
-	                seqkit fx2tab -j "$MAX_JOBS" templates/"$gene"_templates.fasta | awk '{ print $2, $3 }' OFS="\t" >> templates/"$gene"_templates_lookup.tsv
+			## extract to tab-delimited format directly
+			seqkit subseq -j "$MAX_JOBS" --bed templates/"$gene".coords.bed --up-stream 150 --down-stream 150 templates/"$gene".template >> templates/"$gene"_templates.fasta
+			seqkit fx2tab -j "$MAX_JOBS" templates/"$gene"_templates.fasta | awk '{ print $2, $3 }' OFS="\t" >> templates/"$gene"_templates_lookup.tsv
 
-	                for j in `cut -f2 templates/"$gene".positions`; do grep -v ">" templates/"$gene".template | cut -c"$j" >> templates/"$gene".probes; done
+			for j in `cut -f2 templates/"$gene".positions`; do grep -v ">" templates/"$gene".template | cut -c"$j" >> templates/"$gene".probes; done
 
-	                paste templates/"$gene".probes templates/"$gene".positions templates/"$gene"_templates_lookup.tsv | 
-	                        #sed 's/-/\t/1' | 
-	                        cut -f1,2,4,5,7 | 
-	                        #awk '{ print $0, "'$KMER'" }' OFS="\t" | 
-	                        awk '{ print $2, $1, $3, $4, $5 }' OFS="\t" | 
-	                        awk -F "\t" '$2 !~ "n|N"' | 
-	                        awk -F "\t" '$2 !~ "AAAAA|CCCCC|GGGGG|TTTTT"' | 
-	                        awk '{ print $0, match($5, $2)","'$kmer'"" }' OFS="\t" | 
-	                        # Remove guides that do not contain all nucleotide bases
-	                        awk -F "\t" '$2 ~ /A/ && $2 ~ /C/ && $2 ~ /G/ && $2 ~ /T/' \
-	                        >> allgenes_lookup.tsv
+			paste templates/"$gene".probes templates/"$gene".positions templates/"$gene"_templates_lookup.tsv | 
+				#sed 's/-/\t/1' | 
+				cut -f1,2,4,5,7 | 
+				#awk '{ print $0, "'$KMER'" }' OFS="\t" | 
+				awk '{ print $2, $1, $3, $4, $5 }' OFS="\t" | 
+				awk -F "\t" '$2 !~ "n|N"' | 
+				awk -F "\t" '$2 !~ "AAAAA|CCCCC|GGGGG|TTTTT"' | 
+				awk '{ print $0, match($5, $2)","'$kmer'"" }' OFS="\t" | 
+				# Remove guides that do not contain all nucleotide bases
+				awk -F "\t" '$2 ~ /A/ && $2 ~ /C/ && $2 ~ /G/ && $2 ~ /T/' \
+				>> allgenes_lookup.tsv
+			rm templates/"$gene"*
+		
+		else 
+			logger "PAM not present in ["$gene"]..skipping.."
+			#rm templates/"$gene"*
+		fi
 
-	                        rm templates/"$gene"*
+	done < conserved90pct_genes_specific.txt
 
-	                else 
-	                	logger "PAM not present in ["$gene"]..skipping.."
-	                	rm templates/"$gene"*
-	                fi
+	#set -e
+	rm -rf templates
+	cd gene_alignments
+	tar -cf - *.cons --remove-files | pigz -9 -p 16 > consensus.tar.gz
 
-	        done < conserved90pct_genes_specific.txt
+	cd "$PANGENOME"
+	[[ -s allgenes_lookup.tsv ]] || error_exit "Failed to generate "allgenes_lookup.tsv""
 
-	        rm -rf templates
-	        cd gene_alignments
-	        tar -cf - *.cons --remove-files | pigz -9 -p 16 > consensus.tar.gz
-
-	        cd "$PANGENOME"
-	        [[ -s allgenes_lookup.tsv ]] || error_exit "Failed to generate "allgenes_lookup.tsv""
-
-	        cd $OUTPUT
+	cd $OUTPUT
 }
 
 
@@ -1106,14 +1123,14 @@ precheck_guides_pangenome() {
         ###########################################################################################################################
         # More lenient approach, where guides are only eliminated if present adjacent to TTTN PAM in non-target or human genome
 
-        ## Get kmers from non-target genomes to exclude if containing adjacent PAM
-        for i in fwd rev; do
-        	glistquery $KMER_OFFTARGET/combined_offtarget_"$kmerpam"_union.list -f guides_precheck/guides_pass_"$i"_pam.txt \
-        	--mismatch 2 | 
-        	awk -F "\t" '$2!=0 {print $1}' | 
-        	awk '{ $1 = substr($1, 5, "'$kmerpam'") } 1' | 
-        	sort | uniq > remove_nontargethits_"$i";
-        done
+    ## Get kmers from non-target genomes to exclude if containing adjacent PAM
+    for i in fwd rev; do
+       	glistquery $KMER_OFFTARGET/combined_offtarget_"$kmerpam"_union.list -f guides_precheck/guides_pass_"$i"_pam.txt \
+       	--mismatch 2 | 
+       	awk -F "\t" '$2!=0 {print $1}' | 
+       	awk '{ $1 = substr($1, 5, "'$kmerpam'") } 1' | 
+       	sort | uniq > remove_nontargethits_"$i";
+	done
 
 	## Remove guides present in the human genome with adjacent PAM
 	for i in fwd rev; do
@@ -1124,24 +1141,24 @@ precheck_guides_pangenome() {
 		sort | uniq > remove_humanhits_"$i";
 	done
 
-        # Reverse complement rev hits
-        cat remove_*hits*_rev | sort | uniq | nl | 
-        sed 's/^ */>seq/g' | 
-        sed 's/\t/\n/g' | 
-        seqkit seq -r -t DNA -v -p |
-        grep -v ">" > remove_rev.txt
+	# Reverse complement rev hits
+	cat remove_*hits*_rev | sort | uniq | nl | 
+	sed 's/^ */>seq/g' | 
+	sed 's/\t/\n/g' | 
+	seqkit seq -r -t DNA -v -p |
+	grep -v ">" > remove_rev.txt
 
-        ###########################################################################################################################
+	###########################################################################################################################
 
-        cat remove_*hits*_fwd remove_rev.txt | sort | uniq > remove
+	cat remove_*hits*_fwd remove_rev.txt | sort | uniq > remove
 
-        [[ -s remove ]] && grep -vwF -f remove guides_precheck/allgenes_lookup_pass.tsv > guides_precheck/allgenes_lookup_pass_nohuman.tsv
-        mv guides_precheck/allgenes_lookup_pass_nohuman.tsv guides_precheck/allgenes_lookup_pass.tsv
+	[[ -s remove ]] && grep -vwF -f remove guides_precheck/allgenes_lookup_pass.tsv > guides_precheck/allgenes_lookup_pass_nohuman.tsv
+	mv guides_precheck/allgenes_lookup_pass_nohuman.tsv guides_precheck/allgenes_lookup_pass.tsv
 
-        ## Check if there are guides remaining after filtering
-        [[ -s guides_precheck/allgenes_lookup_pass.tsv ]] || error_exit "No guides remaining after excluding non-target hits"
+	## Check if there are guides remaining after filtering
+	[[ -s guides_precheck/allgenes_lookup_pass.tsv ]] || error_exit "No guides remaining after excluding non-target hits"
 
-        cd $OUTPUT
+	cd $OUTPUT
 }
 
 
@@ -2140,9 +2157,9 @@ get_guide_coordinates() {
 		cut -f1-5,7 |
 		awk '{ print $1, $(NF-4), $(NF-3), $(NF-2), $(NF-1), $(NF) }' OFS="\t" > $COORD_OUT/$i.bed; done
 
-		find "$ALIGN_OUT" -type f -name "*.sam" | xargs rm
+	find . -type f -name "*.sam" | xargs rm
 
-		cd $OUTPUT
+	cd $OUTPUT
 
 }
 
