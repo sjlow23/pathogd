@@ -173,6 +173,8 @@ fi
 
 # Taxonkit requires the NCBI taxonomy installed!
 
+# Taxonkit does not seem to work with environment variable
+# despite the suggestions in the read
 TAXONKIT_DB="$HOME/.taxonkit"
 if [ ! -f "$HOME/.taxonkit/names.dmp" ] || [ ! -f "$HOME/.taxonkit/nodes.dmp" ] ||  [ ! -f "$HOME/.taxonkit/delnodes.dmp" ] ||  [ ! -f "$HOME/.taxonkit/merged.dmp" ]; then
 	ncbi_taxdir="$OUTPUT/ncbi_tax"
@@ -184,10 +186,6 @@ if [ ! -f "$HOME/.taxonkit/names.dmp" ] || [ ! -f "$HOME/.taxonkit/nodes.dmp" ] 
 	fi
 	TAXONKIT_DB="$ncbi_taxdir"
 fi
-
-# Taxonkit does not seem to work with environment variable
-# despite the suggestions in the read
-echo $TAXONKIT_DB
 
 # Define functions
 check_assemblies_taxid() {
