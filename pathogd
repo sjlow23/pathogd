@@ -115,8 +115,13 @@ PRIMERS=$OUTPUT/primers
 LOG=$OUTPUT/pathogd.log
 DATABASE=$MYDIR/database
 
+# Previous statement failed when executing without `-t`
+if [[ ! -z "$CPU" ]]; then
+	CPU_CORES="$CPU"
+else
+	CPU_CORES=$(nproc)
+fi
 
-[[ ! -z "$CPU" ]] && CPU_CORES="$CPU" || CPU_CORES=$(nproc)
 MAX_JOBS=$((CPU_CORES - 1))
 MAX_THREADS_PER_JOB=4
 MAX_PARALLEL_JOBS=$((MAX_JOBS/2))
@@ -131,7 +136,8 @@ echo "Max parallel jobs is "$MAX_PARALLEL_JOBS""
 [[ ! -d "$OUTPUT" ]] && mkdir -p $OUTPUT
 cp $MYDIR/$IN $OUTPUT
 
-
+# Otherwise does not work with absolute or relative paths!
+IN=$(basename $IN)
 
 ## Parse config file
 awk -F "|" '/\|/ && $2 ~ /[^\s]+/ {print $1, $2}' OFS="\t" "$OUTPUT"/"$IN" > "$OUTPUT"/params.tsv
@@ -142,7 +148,14 @@ done < "$OUTPUT"/params.tsv
 
 kmerpam=$((kmer + 4))
 
-logger "Your target species is '$target'"
+# Target variables used in this script do not 
+# exist in the provided `contig.txt` file!
+target=$target_species 
+target_taxid=$target_species_taxid
+offtarget=$offtarget_species
+offtarget_taxid=$offtarget_species_taxid
+
+logger "Your target species is '$target'"  
 logger "Your output directory is: '"$OUTPUT"'"
 logger "Using "$CPU_CORES" threads"
 
@@ -158,6 +171,24 @@ if [ $MODE == "ncbi_all_nosubsample" ] ||  [ $MODE == "user_all_nosubsample" ] |
 fi
 
 
+# Taxonkit requires the NCBI taxonomy installed!
+
+TAXONKIT_DB="$HOME/.taxonkit"
+if [ ! -f "$HOME/.taxonkit/names.dmp" ] || [ ! -f "$HOME/.taxonkit/nodes.dmp" ] ||  [ ! -f "$HOME/.taxonkit/delnodes.dmp" ] ||  [ ! -f "$HOME/.taxonkit/merged.dmp" ]; then
+	ncbi_taxdir="$OUTPUT/ncbi_tax"
+	if [ ! -f "$ncbi_taxdir/names.dmp" ] || [ ! -f "$ncbi_taxdir/nodes.dmp" ] || [ ! -f  "$ncbi_taxdir/delnodes.dmp" ] ||  [ ! -f  "$ncbi_taxdir/merged.dmp" ]; then
+		echo "Taxonkit taxonomy not found in output directory, creating directory and downloading latest NCBI Taxonomy"
+		mkdir -p $ncbi_taxdir
+		wget ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz  --output-document="$ncbi_taxdir/taxdump.tar.gz"
+		tar xf "$ncbi_taxdir/taxdump.tar.gz" -C "$ncbi_taxdir"
+	fi
+	TAXONKIT_DB="$ncbi_taxdir"
+fi
+
+# Taxonkit does not seem to work with environment variable
+# despite the suggestions in the read
+echo $TAXONKIT_DB
+
 # Define functions
 check_assemblies_taxid() {
 
@@ -168,30 +199,31 @@ check_assemblies_taxid() {
 	cd "$OUTPUT"
 	logger "Checking number of genome assemblies available for '$target'" 
 
-	if [[ "$domain" == "bacteria" ]]
-	then
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/bacteria/assembly_summary.txt --output-document=genbank.txt
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt --output-document=refseq.txt
-	elif [[ "$domain" == "viral" ]]
-	then	
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/viral/assembly_summary.txt --output-document=genbank.txt
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt --output-document=refseq.txt
-	elif [[ "$domain" == "fungi" ]]
-	then 
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/fungi/assembly_summary.txt --output-document=genbank.txt
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt --output-document=refseq.txt
-	elif [[ "$domain" == "protozoa" ]]
-	then
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/protozoa/assembly_summary.txt --output-document=genbank.txt
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/protozoa/assembly_summary.txt --output-document=refseq.txt
-
+	if [ ! -f "genbank.txt" ] || [ ! -f "refseq.txt" ]; then  # condition to avoid redownload of summaries for testing - can be removed if behaviour not desired
+		if [[ "$domain" == "bacteria" ]]
+		then
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/bacteria/assembly_summary.txt --output-document=genbank.txt
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt --output-document=refseq.txt
+		elif [[ "$domain" == "viral" ]]
+		then	
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/viral/assembly_summary.txt --output-document=genbank.txt
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt --output-document=refseq.txt
+		elif [[ "$domain" == "fungi" ]]
+		then 
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/fungi/assembly_summary.txt --output-document=genbank.txt
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt --output-document=refseq.txt
+		elif [[ "$domain" == "protozoa" ]]
+		then
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/protozoa/assembly_summary.txt --output-document=genbank.txt
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/protozoa/assembly_summary.txt --output-document=refseq.txt
+		fi
 	fi
-	
 
 	if [[ -n "$target_taxid" && -n "$offtarget_taxid" ]]; then
+		
 		# Get all children species taxids under user-provided parent taxids
-		taxonkit list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
-		taxonkit list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
+		taxonkit --data-dir $TAXONKIT_DB list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
+		taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 	else
 		target_genbank=$(grep -w "$target" genbank.txt | wc -l)
 		target_refseq=$(grep -w "$target" refseq.txt | wc -l)
@@ -223,13 +255,13 @@ check_assemblies_taxid() {
 		fi
 
 		# Target genomes
-		mkdir "$db"
+		mkdir -p "$db"  # fix to allow existing directory
 		cd "$db"
 
 		# If using taxids
-		if [[ -n "target_taxid" ]]; then
+		if [[ -n "$target_taxid" ]]; then  # fix: this likely needed to be a variable?
 			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/target_sptaxids.txt "$OUTPUT"/"$db".txt > target_"$db".txt
-			rm "$OUTPUT"/target_sptaxids.txt
+			# rm "$OUTPUT"/target_sptaxids.txt  # fix: this removes the file in the second iteration (refseq) and break the workflow
 		# If using species name
 		else
 			if [[ "$target" == *,* ]]; then
@@ -276,7 +308,7 @@ check_assemblies_taxid() {
 		# If using taxids
 		if [[ -n "$offtarget_taxid" ]]; then
 			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/nontarget_sptaxids.txt "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
-			rm "$OUTPUT"/nontarget_sptaxids.txt
+			# rm "$OUTPUT"/nontarget_sptaxids.txt  # fix: this removes the file in the second iteration (refseq) and break the workflow
 		# if using species name
 		else
 			if [[ "$offtarget" == *,* ]]; then
@@ -328,7 +360,7 @@ check_assemblies_taxid() {
 		cd "$OUTPUT"
 
 	done
-
+	
 	rm genbank.txt refseq.txt
 
 }
@@ -344,7 +376,7 @@ download_target_genomes() {
 	then
 		if [[ -n "$target_taxid" ]]
 		then
-			taxonkit list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
+			taxonkit --data-dir $TAXONKIT_DB list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
 
 			logger "Downloading target genomes using target species taxids"
 			ncbi-genome-download \
@@ -380,7 +412,7 @@ download_target_genomes() {
 		no_genomes=0
 		if [[ -n "$target_taxid" ]]
 		then
-			taxonkit list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
+			taxonkit --data-dir $TAXONKIT_DB list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
 			
 			logger "Downloading target genomes from NCBI RefSeq using target species taxids"
 			ncbi-genome-download \
@@ -461,7 +493,7 @@ download_nontarget_genomes() {
 	then
 		if [[ -n "$offtarget_taxid" ]]
 		then
-			taxonkit list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
+			taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 
 			logger "Downloading non-target genomes using non-target species taxids"
 			ncbi-genome-download \
@@ -497,7 +529,7 @@ download_nontarget_genomes() {
 	then
 		if [[ -n "$offtarget_taxid" ]]
 		then
-			taxonkit list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
+			taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 			no_genomes=0
 			
 			logger "Downloading non-target genomes from NCBI RefSeq using non-target species taxids"
