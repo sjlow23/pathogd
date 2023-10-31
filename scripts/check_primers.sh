@@ -2,7 +2,7 @@
 
 usage() {
 	echo -e "\nUsage:"
-	echo -e "  $0 [-i <primers input>] [-d <genome db directory>] [-o <output file>] [-t <number of cpus>]\n"
+	echo -e "  $0 [-i <primers input>] [-d <genome db directory>] [-a <get_amplicons>] [-o <output file>] [-t <number of cpus>]\n"
 	echo -e "	-i	Input file containing three columns in the following order: primer id, forward primer sequence, reverse primer sequence\n"
 	echo -e "	-d	Directory containing target and non-target genome databases\n"
 	echo -e "	-a  Whether to write amplicons to file (yes/no)\n"
