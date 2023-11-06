@@ -188,10 +188,13 @@ If your target or non-target taxa includes multiple species, *eg.* all species b
 
    2. To obtain genomes at taxonomic ranks below species level, eg. sub-species or strain level, please download genomes manually. See [ncbi-genome-download](https://github.com/kblin/ncbi-genome-download "ncbi-genome-download") or [ncbi-datasets](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/ "ncbi_datasets") for options to download genomes using NCBI taxids and/or taxon names. 
 
+   3. If using the `check` workflow with species names, ensure that only one species is specified for the `target` and `offtarget` fields in `config.txt`.
+
    The outputs of the `check` workflow are:
 
    * Number of target and non-target genomes available (specified in log file)
    * Scripts for downloading target and non-target genomes for GenBank and/or RefSeq assemblies. Random subsampling is automatically performed to retain a maximum of 1000 and 100 genomes for each target and non-target species, respectively.
+
 
 
 <p align="right">(<a href="#usage-top">back to top</a>)</p>
@@ -342,6 +345,48 @@ For the `ncbi_*` and `user_*` workflows with primer and gRNA design, the most re
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+
+## Checking sensitivity and specificity of user-provided primers and guide RNAs
+
+A set of scripts included to validate a set of user-provided primers and guide RNAs.
+
+Example use cases:
+i) You have a set of primers and guide RNAs designed elsewhere and would like to estimate the prevalence of their binding sites across a set of target and non-target genomes.
+ii) You would like to estimate the prevalence of binding sites of previously designed primers and guide RNAs from PathoGD across a newer database containing additional target and/or non-target genomes.
+
+If primers and guide RNAs were designed elsewhere, you will need to provide a target and non-target genome database to run these scripts. See sections `A` and `B` above for examples on how to download these genomes.
+The target and non-target genome directories should have the names `genomes_target` and `genomes_offtarget`, respectively.
+
+
+1. Estimate primer prevalence across a set of target genomes and/or non-target genomes
+   
+   ```sh
+   primer_stats.sh -i primers.txt -d pathogd_output -o primer_prevalence.tsv
+   ``` 
+
+   `primers.txt` is a three-column tab-delimited file with the following information: unique primer id, forward primer sequence, reverse primer sequence. If filtering from `pathogd_primers_stats.tsv` output file, extract columns `primerset_new`, `fwd_primer`, and `rev_primer`.
+
+   `pathogd_output` is the parent directory containing the target and non-target genome databases.
+
+
+   ```sh
+   primer_stats.sh -i primers.txt -d pathogd_output -o pathogd_primer_prevalence.tsv -a yes
+   ``` 
+   Generate FASTA file of amplicons in addition to primer prevalence output.
+
+   The output files will be in a directory called `primer_stats`.
+
+
+2. Estimate guide prevalence across a set of target genomes and/or non-target genomes
+
+   ```sh
+   guide_prevalence.sh -i guides.fasta -d pathogd_output -o pathogd_guide_prevalence.tsv
+   ``` 
+
+   The output files will be in a directory called `guide_stats`.
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 ## Citation
