@@ -211,7 +211,7 @@ map_guides() {
 		
 		logger "Mapping "$guidecount" guides to "$genomecount" target genomes"
 		local outfile="$mydir/target_guides_mapped.tsv"
-		
+
 	elif [[ $1 == "nontarget" ]]
 	then
 		local mydir="$OUTDIR"/offtarget
@@ -264,7 +264,7 @@ map_guides() {
 		logger "Parsing guide hits to "$1" genomes"
 		#sed -i '1i genome\tguide\tcigar\tmismatch_count\tsoftclip_count\tbounds_tag' $outfile
 
-		# Remove if contain soft-clip and not at edge of contig
+		# Remove alignment if soft-clipped, except for sequences mapping to edge of reference genome/contig
 		awk -F "\t" '{ if ($5==0 || ($5!=0 && $6=="XB:Z:O")) print $1, $2, $3, $4, $5 }' OFS="\t" $outfile > "$outfile".2
 
 		# Filter by allowed mismatches
@@ -296,7 +296,6 @@ map_guides() {
 		find . -size 0 -name "*mm*.tsv" -type f -print -delete
 
 		csvtk join -t -f guide $OUTDIR/"$1"_mm*_$OUTPUT > $OUTDIR/"$1"_$OUTPUT
-		#csvtk rename -t -f 2,4,6 -n guide_prev_mm0,guide_prev_mm1,guide_prev_mm2
 
 		rm $OUTDIR/"$1"_mm*_$OUTPUT
 
