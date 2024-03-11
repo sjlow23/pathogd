@@ -348,7 +348,7 @@ For the `ncbi_*` and `user_*` workflows with primer and gRNA design, the most re
 
 ## Checking sensitivity and specificity of user-provided primers and guide RNAs
 
-A set of scripts included to validate a set of user-provided primers and guide RNAs.
+A set of helper scripts included to validate a set of user-provided primers and guide RNAs.
 
 Example use cases:
 i) You have a set of primers and guide RNAs designed elsewhere and would like to estimate the prevalence of their binding sites across a set of target and non-target genomes.
@@ -361,7 +361,7 @@ The target and non-target genome directories should have the names `genomes_targ
 1. Estimate primer prevalence across a set of target genomes and/or non-target genomes
    
    ```sh
-   primer_stats.sh -i primers.txt -d pathogd_output -o primer_prevalence.tsv
+   check_primers.sh -i primers.txt -d pathogd_output -o primer_prevalence.tsv
    ``` 
 
    `primers.txt` is a three-column tab-delimited file with the following information: unique primer id, forward primer sequence, reverse primer sequence. If filtering from `pathogd_primers_stats.tsv` output file, extract columns `primerset_new`, `fwd_primer`, and `rev_primer`.
@@ -369,10 +369,12 @@ The target and non-target genome directories should have the names `genomes_targ
    `pathogd_output` is the parent directory containing the target and non-target genome databases.
 
 
+   To generate a FASTA file of amplicons in addition to primer prevalence output, use the `-a` flag.
+
    ```sh
-   primer_stats.sh -i primers.txt -d pathogd_output -o pathogd_primer_prevalence.tsv -a yes
+   check_primers.sh -i primers.txt -d pathogd_output -o pathogd_primer_prevalence.tsv -a yes
    ``` 
-   Generate FASTA file of amplicons in addition to primer prevalence output.
+   
 
    The output files will be in a directory called `primer_stats`.
 
@@ -380,13 +382,21 @@ The target and non-target genome directories should have the names `genomes_targ
 2. Estimate guide prevalence across a set of target genomes and/or non-target genomes
 
    ```sh
-   guide_prevalence.sh -i guides.fasta -d pathogd_output -o pathogd_guide_prevalence.tsv
+   check_guides.sh -i guides.fasta -d pathogd_output -o pathogd_guide_prevalence.tsv
    ``` 
 
    The output files will be in a directory called `guide_stats`.
 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+
+## Which module (pangenome or *k*-mer) should I use?
+
+The module that you should use depends on your target organism and specific assay needs. Generally speaking, both modules should work well for bacterial genomes.
+The pangenome module will generate primer and gRNA candidates that are in protein-coding regions, while the *k*-mer module additionally considers non-protein-coding regions.
+The *k*-mer module has the advantage of identifying candidate gRNAs that are present in multiple copies across the genome, but do not necessarily have flanking regions that are conserved, so primers may not be able to be designed for these gRNAs.
+However, they can still be useful for an assay not requiring a pre-amplification step.
 
 
 ## Citation
