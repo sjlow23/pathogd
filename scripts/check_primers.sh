@@ -242,6 +242,7 @@ get_amplicons() {
 		cat $file | \
 		parallel -j "$CPU" \
 		'isPcr -maxSize='"$maxampliconsize"' \
+		-minPerfect=5 \
 		-out=fa \
 		'"$genomedir"'/"{}"_genomic.fna \
 		'"$IN"' \
