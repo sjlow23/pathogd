@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # set -e
 # set -u
@@ -30,8 +30,8 @@ usage() {
 	echo "Optional:"
 	echo -e   "	-r	Reference genome GenBank file for training and annotation (pangenome method only)\n"
 	echo -e	  "	-t 	Number of cpus\n"
-        echo -e "	-h      Print this help menu\n"
-        exit 0
+	echo -e "	-h      Print this help menu\n"
+	exit 0
 }
 
 
@@ -48,51 +48,51 @@ logger() {
 
 if [[ $# -lt 6 ]]
 then
-       usage
-       exit 0
+	   usage
+	   exit 0
 else
-        while getopts "c:m:w:o:r:t:h" opt
-        do
-                case $opt in
-                	c) IN=$OPTARG;;
-			m) METHOD=$OPTARG;;
-			w) MODE=$OPTARG;;
-			r) REF=$OPTARG;;
-                        o) OUT=$OPTARG;;
-			t) CPU=$OPTARG;;
-                        h) usage;;
-                        \?) echo -e "\nInvalid option: -$OPTARG"
-                        usage;;
-                        :) echo -e "\nOption -$OPTARG requires an argument!\n"
-                           exit 0;;
-                esac
-        done
-        shift $(( OPTIND - 1 ))
+		while getopts "c:m:w:o:r:t:h" opt
+		do
+			case $opt in
+				c) IN=$OPTARG;;
+				m) METHOD=$OPTARG;;
+				w) MODE=$OPTARG;;
+				r) REF=$OPTARG;;
+				o) OUT=$OPTARG;;
+				t) CPU=$OPTARG;;
+				h) usage;;
+				\?) echo -e "\nInvalid option: -$OPTARG"
+					usage;;
+				:) echo -e "\nOption -$OPTARG requires an argument!\n"
+					exit 0;;
+			esac
+		done
+		shift $(( OPTIND - 1 ))
 fi
 
 
 # Exit if mandatory arguments missing
 
 if [[ -z "$IN" ]]; then
-    echo -e "\nInput config file \"-c\" must be specified!\n"
-    usage
+	echo -e "\nInput config file \"-c\" must be specified!\n"
+	usage
 fi
 
 if [[ -z "$MODE" ]]; then
-    echo -e "\nWorkflow \"-w\" must be specified!\n"
-    usage
+	echo -e "\nWorkflow \"-w\" must be specified!\n"
+	usage
 fi
 
 if [[ -z "$OUT" ]]; then
-    echo -e "\nOutput directory \"-o\" must be specified!\n"
-    usage
+	echo -e "\nOutput directory \"-o\" must be specified!\n"
+	usage
 fi
 
 if [[ "$MODE" != "check" ]] && [[ "$MODE" != "download_target" ]] && [[ "$MODE" != "download_nontarget" ]]; then
-    if [[ -z "$METHOD" ]]; then
-        echo -e "\nModule \"-m\" must be specified for workflows other than 'check', 'download_target', and 'download_nontarget'!\n"
-        usage
-    fi
+	if [[ -z "$METHOD" ]]; then
+		echo -e "\nModule \"-m\" must be specified for workflows other than 'check', 'download_target', and 'download_nontarget'!\n"
+		usage
+	fi
 fi
 
 
@@ -116,8 +116,13 @@ PRIMERS=$OUTPUT/primers
 LOG=$OUTPUT/pathogd.log
 DATABASE=$MYDIR/database
 
+# Unbound variable when executing without `-t`
+if [[ ! -z "${CPU+x}" ]]; then
+	CPU_CORES="$CPU"
+else
+	CPU_CORES=$(nproc)
+fi
 
-[[ ! -z "$CPU" ]] && CPU_CORES="$CPU" || CPU_CORES=$(nproc)
 MAX_JOBS=$((CPU_CORES - 1))
 MAX_THREADS_PER_JOB=4
 MAX_PARALLEL_JOBS=$((MAX_JOBS/2))
@@ -132,19 +137,25 @@ echo "Max parallel jobs is "$MAX_PARALLEL_JOBS""
 [[ ! -d "$OUTPUT" ]] && mkdir -p $OUTPUT
 cp $MYDIR/$IN $OUTPUT
 
-
+# Otherwise does not work with absolute or relative paths!
+IN=$(basename $IN)
 
 ## Parse config file
 awk -F "|" '/\|/ && $2 ~ /[^\s]+/ {print $1, $2}' OFS="\t" "$OUTPUT"/"$IN" > "$OUTPUT"/params.tsv
 
 while IFS=$'\t' read -r name value; do 
-    declare "$name=$value"
+	declare "$name=$value"
 done < "$OUTPUT"/params.tsv
 
 kmerpam=$((kmer + 4))
 
+target=$target_species 
+target_taxid=$target_species_taxid
+offtarget=$offtarget_species
+offtarget_taxid=$offtarget_species_taxid
+
 ( [[ -n "${target_species:-}" ]] && logger "Your target species is '$target_species'" ) || ( [[ -n "${target_taxid:-}" ]] && logger "Your target species taxid is '$target_taxid'" ) || logger "Target is not defined"
-#logger "Your target species is '$target'"
+
 logger "Your output directory is: '"$OUTPUT"'"
 logger "Using "$CPU_CORES" threads"
 
@@ -156,7 +167,24 @@ source "$conda_path"/etc/profile.d/conda.sh
 
 # If nosubsample workflow selected, reset subsampled variable to no
 if [ $MODE == "ncbi_all_nosubsample" ] ||  [ $MODE == "user_all_nosubsample" ] || [ $MODE == "user_target_nosubsample" ]; then
-      subsample="no"
+	  subsample="no"
+fi
+
+
+# Taxonkit requires the NCBI taxonomy installed!
+
+# Taxonkit does not seem to work with environment variable
+# despite the suggestions in the read
+TAXONKIT_DB="$HOME/.taxonkit"
+if [ ! -f "$HOME/.taxonkit/names.dmp" ] || [ ! -f "$HOME/.taxonkit/nodes.dmp" ] ||  [ ! -f "$HOME/.taxonkit/delnodes.dmp" ] ||  [ ! -f "$HOME/.taxonkit/merged.dmp" ]; then
+	ncbi_taxdir="$OUTPUT/ncbi_tax"
+	if [ ! -f "$ncbi_taxdir/names.dmp" ] || [ ! -f "$ncbi_taxdir/nodes.dmp" ] || [ ! -f  "$ncbi_taxdir/delnodes.dmp" ] ||  [ ! -f  "$ncbi_taxdir/merged.dmp" ]; then
+		echo "Taxonkit taxdump not found in output directory, creating directory and downloading latest NCBI Taxonomy"
+		mkdir -p $ncbi_taxdir
+		wget ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz  --output-document="$ncbi_taxdir/taxdump.tar.gz"
+		tar xf "$ncbi_taxdir/taxdump.tar.gz" -C "$ncbi_taxdir"
+	fi
+	TAXONKIT_DB="$ncbi_taxdir"
 fi
 
 
@@ -170,30 +198,31 @@ check_assemblies_taxid() {
 	cd "$OUTPUT"
 	logger "Checking number of genome assemblies available for '$target_species'" 
 
-	if [[ "$domain" == "bacteria" ]]
-	then
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/bacteria/assembly_summary.txt --output-document=genbank.txt
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt --output-document=refseq.txt
-	elif [[ "$domain" == "viral" ]]
-	then	
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/viral/assembly_summary.txt --output-document=genbank.txt
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt --output-document=refseq.txt
-	elif [[ "$domain" == "fungi" ]]
-	then 
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/fungi/assembly_summary.txt --output-document=genbank.txt
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt --output-document=refseq.txt
-	elif [[ "$domain" == "protozoa" ]]
-	then
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/protozoa/assembly_summary.txt --output-document=genbank.txt
-		wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/protozoa/assembly_summary.txt --output-document=refseq.txt
-
+	if [ ! -f "genbank.txt" ] || [ ! -f "refseq.txt" ]; then  # condition to avoid redownload of summaries for testing - can be removed if behaviour not desired
+		if [[ "$domain" == "bacteria" ]]
+		then
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/bacteria/assembly_summary.txt --output-document=genbank.txt
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt --output-document=refseq.txt
+		elif [[ "$domain" == "viral" ]]
+		then	
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/viral/assembly_summary.txt --output-document=genbank.txt
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt --output-document=refseq.txt
+		elif [[ "$domain" == "fungi" ]]
+		then 
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/fungi/assembly_summary.txt --output-document=genbank.txt
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt --output-document=refseq.txt
+		elif [[ "$domain" == "protozoa" ]]
+		then
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/protozoa/assembly_summary.txt --output-document=genbank.txt
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/protozoa/assembly_summary.txt --output-document=refseq.txt
+		fi
 	fi
-	
 
 	if [[ -n "$target_taxid" && -n "$offtarget_taxid" ]]; then
+		
 		# Get all children species taxids under user-provided parent taxids
-		taxonkit list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
-		taxonkit list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
+		taxonkit --data-dir $TAXONKIT_DB list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
+		taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 	fi
 
 	# Subsample where necessary and generate download script
@@ -212,21 +241,19 @@ check_assemblies_taxid() {
 		# If using taxids
 		if [[ -n "$target_taxid" ]]; then
 			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/target_sptaxids.txt "$OUTPUT"/"$db".txt > target_"$db".txt
-			rm "$OUTPUT"/target_sptaxids.txt
+			
 		# If using species name
 		else
 			# if multiple species present
 			if [[ "$target_species" == *,* ]]; then
-				#target_array=(${target//,/ })
-				#target_taxa=$(echo "${target_array[*]}" | tr ' ' '|')
-				target_taxa=$(echo "target_taxa" | sed 's/,/|/g')
+				target_taxa=$(sed 's/,/|/g' <<< "$target_species")
 				egrep -w "$target_taxa" "$OUTPUT"/"$db".txt > target_"$db".txt
 			else
 				grep -w "$target_species" "$OUTPUT"/"$db".txt > target_"$db".txt
 			fi
 		fi
 	
-		target_count=$(cat target_"$db".txt | wc -l)
+		target_count=$(wc -l <target_"$db".txt)
 		logger ""$target_count" "$mydb" assemblies found for target taxa"
 
 		# Subsample target genomes to maximum of 1000 per species (using species taxid column 7) if overrepresented
@@ -236,10 +263,10 @@ check_assemblies_taxid() {
 		if [[ -s sample.txt && -s keep.txt ]]
 		then
 			logger "Subsampling to a maximum of 1000 target genomes per target species"
-			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -v id={} '\$7 == id {print}' target_"$db".txt | shuf -n 1000" | cut -f20 |
+			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F "\t" -v id={} '\$7 == id {print}' target_"$db".txt | shuf -n 1000" | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' > wget_target_"$db".sh
 			
-			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt target_"$db".txt | cut -f20 |
+			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt FS="\t" target_"$db".txt | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' >> wget_target_"$db".sh
 			
 			rm sample.txt keep.txt
@@ -263,12 +290,10 @@ check_assemblies_taxid() {
 		# If using taxids
 		if [[ -n "$offtarget_taxid" ]]; then
 			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/nontarget_sptaxids.txt "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
-			rm "$OUTPUT"/nontarget_sptaxids.txt
+			# rm "$OUTPUT"/nontarget_sptaxids.txt  # fix: this removes the file in the second iteration (refseq) and break the workflow
 		# if using species name
 		else
 			if [[ "$offtarget" == *,* ]]; then
-				#offtarget_array=(${offtarget//,/ })
-				#offtarget_taxa=$(echo "${offtarget_array[*]}" | tr ' ' '|')
 				offtarget_taxa=$(echo "offtarget_taxa" | sed 's/,/|/g')
 				egrep -w "$offtarget_taxa" "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
 			else
@@ -282,7 +307,7 @@ check_assemblies_taxid() {
 		rm offtarget_"$db"_tmp.txt
 
 
-		offtarget_count=$(cat offtarget_"$db".txt | wc -l)
+		offtarget_count=$(wc -l <"offtarget_$db.txt")
 		logger ""$offtarget_count" "$mydb" assemblies found for non-target taxa"
 
 		# Subsample offtarget genomes to maximum of 100 per species (using species_taxid column 7) if overrepresented
@@ -317,7 +342,7 @@ check_assemblies_taxid() {
 		cd "$OUTPUT"
 
 	done
-
+	
 	rm genbank.txt refseq.txt
 
 }
@@ -333,7 +358,7 @@ download_target_genomes() {
 	then
 		if [[ -n "$target_taxid" ]]
 		then
-			taxonkit list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
+			taxonkit --data-dir $TAXONKIT_DB list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
 
 			logger "Downloading target genomes using target species taxids"
 			ncbi-genome-download \
@@ -369,7 +394,7 @@ download_target_genomes() {
 		no_genomes=0
 		if [[ -n "$target_taxid" ]]
 		then
-			taxonkit list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
+			taxonkit --data-dir $TAXONKIT_DB list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
 			
 			logger "Downloading target genomes from NCBI RefSeq using target species taxids"
 			ncbi-genome-download \
@@ -450,7 +475,7 @@ download_nontarget_genomes() {
 	then
 		if [[ -n "$offtarget_taxid" ]]
 		then
-			taxonkit list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
+			taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 
 			logger "Downloading non-target genomes using non-target species taxids"
 			ncbi-genome-download \
@@ -486,7 +511,7 @@ download_nontarget_genomes() {
 	then
 		if [[ -n "$offtarget_taxid" ]]
 		then
-			taxonkit list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
+			taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 			no_genomes=0
 			
 			logger "Downloading non-target genomes from NCBI RefSeq using non-target species taxids"
@@ -649,17 +674,17 @@ prepare_human_genome() {
 		logger "k-mer lists for human genome for selected 'k' previously generated"
 	elif [[ ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list && ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list ]]
 	then
-		logger "Counting k=$kmer and k=$kmerpam in human genome"
+		logger "Counting k="$kmer" and k="$kmerpam" in human genome"
 		glistmaker GCF_000001405.40_GRCh38.p14_genomic.fna --num_threads "$MAX_JOBS" -w "$kmer" -o GCF_000001405.40_GRCh38.p14_genomic
 		glistmaker GCF_000001405.40_GRCh38.p14_genomic.fna --num_threads "$MAX_JOBS" -w "$kmerpam" -o GCF_000001405.40_GRCh38.p14_genomic
 
 	elif [[ -s GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list && ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list ]]
 	then
-		logger "Counting k=$kmerpam in human genome"
+		logger "Counting k="$kmerpam" in human genome"
 		glistmaker GCF_000001405.40_GRCh38.p14_genomic.fna --num_threads "$MAX_JOBS" -w "$kmerpam" -o GCF_000001405.40_GRCh38.p14_genomic
 	elif [[ -s GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list && ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list ]]
 	then
-		logger "Counting k=$kmer in human genome"
+		logger "Counting k="$kmer" in human genome"
 		glistmaker GCF_000001405.40_GRCh38.p14_genomic.fna --num_threads "$MAX_JOBS" -w "$kmer" -o GCF_000001405.40_GRCh38.p14_genomic
 	fi
 
@@ -672,7 +697,7 @@ prepare_human_genome() {
 subsample_genomes() {
 	cd $OUTPUT
 
-	local oricount=$(wc -l $OUTPUT/genomes_target.txt | awk '{ print $1 }')
+	local oricount=$(wc -l <$OUTPUT/genomes_target.txt)
 
 	[[ -s "$OUTPUT"/genomes_target.txt ]] || { error_exit "No target genomes found"; return; }
 	
@@ -685,6 +710,7 @@ subsample_genomes() {
 	elif [[ "$oricount" -le "$subsample" ]]
 	then
 		logger "Using all "$oricount" target genomes"
+		cp "$OUTPUT"/genomes_target.txt "$OUTPUT"/genomes_target_subsample.txt
 	fi
 }
 
@@ -965,13 +991,13 @@ get_guides_pam() {
 		do
 			pam_found=false
 			positions=$(grep -v ">" templates/"$gene".template | grep -aob "$i" | grep -oE '[0-9]+' | wc -l)
-    
-		    # Check if positions are empty
-		    if [[ "$positions" -eq 0 ]]; then
-		    	continue
-		    else
-		    	pam_found=true
-		    	
+	
+			# Check if positions are empty
+			if [[ "$positions" -eq 0 ]]; then
+				continue
+			else
+				pam_found=true
+				
 				grep -v ">" templates/"$gene".template | 
 				# count positions excluding header
 				grep -aob "$i" | 
@@ -997,13 +1023,13 @@ get_guides_pam() {
 			genelength=$(($(grep -v ">" templates/"$gene".template | wc -m) - 1))
 			
 			positions=$(grep -v ">" templates/"$gene".template | grep -aob "$i" | grep -oE '[0-9]+' | wc -l)
-    
-		    # Check if positions are empty
-		    if [[ "$positions" -eq 0 ]]; then
-		        continue
-		    else
-		    	pam_found=true
-		    	
+	
+			# Check if positions are empty
+			if [[ "$positions" -eq 0 ]]; then
+				continue
+			else
+				pam_found=true
+				
 				grep -v ">" templates/"$gene".template | 
 				grep -aob "$i" | 
 				grep -oE '[0-9]+' | 
@@ -1071,38 +1097,38 @@ precheck_guides_pangenome() {
 
 	while IFS=$'\t' read gene oligo pam seqname sequence target
 	do
-        	## Reverse translate actual guide sequence
-                #oligo_revseq=$(echo "$oligo" | sed 's/^/>seq/g' | seqkit seq -r -t DNA -v -p | grep -v ">")
+			## Reverse translate actual guide sequence
+				#oligo_revseq=$(echo "$oligo" | sed 's/^/>seq/g' | seqkit seq -r -t DNA -v -p | grep -v ">")
 
-                {
-                	echo "SEQUENCE_ID=$seqname"
-                	echo "SEQUENCE_INTERNAL_OLIGO=$oligo"
-                	echo "PRIMER_TASK=check_primers"
-                	echo "PRIMER_SECONDARY_STRUCTURE_ALIGNMENT=1"
-                	echo "PRIMER_PICK_INTERNAL_OLIGO=1"
-                	echo "PRIMER_INTERNAL_MIN_SIZE=18"
-                	echo "PRIMER_INTERNAL_MAX_SIZE=30"
-                	echo "PRIMER_INTERNAL_MIN_TM=40.0"
-                	echo "PRIMER_EXPLAIN_FLAG=1"
-                	echo "="
-                } >> guides_precheck/allguides.input.p3
+				{
+					echo "SEQUENCE_ID=$seqname"
+					echo "SEQUENCE_INTERNAL_OLIGO=$oligo"
+					echo "PRIMER_TASK=check_primers"
+					echo "PRIMER_SECONDARY_STRUCTURE_ALIGNMENT=1"
+					echo "PRIMER_PICK_INTERNAL_OLIGO=1"
+					echo "PRIMER_INTERNAL_MIN_SIZE=18"
+					echo "PRIMER_INTERNAL_MAX_SIZE=30"
+					echo "PRIMER_INTERNAL_MIN_TM=40.0"
+					echo "PRIMER_EXPLAIN_FLAG=1"
+					echo "="
+				} >> guides_precheck/allguides.input.p3
 
-        done < allgenes_lookup.tsv
+		done < allgenes_lookup.tsv
 
-        ## Filter out guides with bad properties using Primer3
-        logger "Filtering low-quality guides"
-        primer3_core < guides_precheck/allguides.input.p3 > guides_precheck/allguides.output.p3
+		## Filter out guides with bad properties using Primer3
+		logger "Filtering low-quality guides"
+		primer3_core < guides_precheck/allguides.input.p3 > guides_precheck/allguides.output.p3
 
-        sed 's/^=/\n/g' guides_precheck/allguides.output.p3 |\
-        awk -v RS= '/\nPRIMER_INTERNAL_NUM_RETURNED=1/' |\
-        grep SEQUENCE_ID |\
-        awk -F "=" '{ print $2 }' >> guides_precheck/guides_allpass.txt
+		sed 's/^=/\n/g' guides_precheck/allguides.output.p3 |\
+		awk -v RS= '/\nPRIMER_INTERNAL_NUM_RETURNED=1/' |\
+		grep SEQUENCE_ID |\
+		awk -F "=" '{ print $2 }' >> guides_precheck/guides_allpass.txt
 
-        grep -wF -f guides_precheck/guides_allpass.txt allgenes_lookup.tsv > guides_precheck/allgenes_lookup_pass.tsv
+		grep -wF -f guides_precheck/guides_allpass.txt allgenes_lookup.tsv > guides_precheck/allgenes_lookup_pass.tsv
 
-        ## Remove guides (+ strand) with hits to human or non-target species genomes
-        awk -F "\t" '{ if ($4 ~ /f$/) print $2 }' guides_precheck/allgenes_lookup_pass.tsv > guides_precheck/guides_pass_fwd.txt
-        awk '{ print "TTTA"$0; print "TTTC"$0; print "TTTG"$0; print "TTTT"$0; }' guides_precheck/guides_pass_fwd.txt > guides_precheck/guides_pass_fwd_pam.txt
+		## Remove guides (+ strand) with hits to human or non-target species genomes
+		awk -F "\t" '{ if ($4 ~ /f$/) print $2 }' guides_precheck/allgenes_lookup_pass.tsv > guides_precheck/guides_pass_fwd.txt
+		awk '{ print "TTTA"$0; print "TTTC"$0; print "TTTG"$0; print "TTTT"$0; }' guides_precheck/guides_pass_fwd.txt > guides_precheck/guides_pass_fwd_pam.txt
 
 	## Remove guides (- strand) with hits to human or non-target species genomes
 	awk -F "\t" '{ if ($4 ~ /r$/) print ">"$4"\n"$2 }' OFS="\t" guides_precheck/allgenes_lookup_pass.tsv > guides_precheck/guides_pass_rev.fasta
@@ -1111,25 +1137,25 @@ precheck_guides_pangenome() {
 
 
 	###########################################################################################################################
-        ## Get kmers from non-target genomes to exclude, allowing up to 2 mismatches
-        # glistquery $KMER_OFFTARGET/combined_offtarget_"$kmer"_union.list -f guides_precheck/guides_pass.txt --mismatch 2 | \
-        # 	awk -F "\t" '$2!=0 {print $1}' > remove_nontargethits
+		## Get kmers from non-target genomes to exclude, allowing up to 2 mismatches
+		# glistquery $KMER_OFFTARGET/combined_offtarget_"$kmer"_union.list -f guides_precheck/guides_pass.txt --mismatch 2 | \
+		# 	awk -F "\t" '$2!=0 {print $1}' > remove_nontargethits
 
 	# ## Remove guides present in the human genome (allowing up to 2 mismatches)
-        # glistquery $HUMAN/GRCh38_latest_genomic_"$kmer".list -f guides_precheck/guides_pass.txt --mismatch 2 | \
-        # 	awk -F "\t" '$2!=0 {print $1}' > remove_humanhits
+		# glistquery $HUMAN/GRCh38_latest_genomic_"$kmer".list -f guides_precheck/guides_pass.txt --mismatch 2 | \
+		# 	awk -F "\t" '$2!=0 {print $1}' > remove_humanhits
 
 
-        ###########################################################################################################################
-        # More lenient approach, where guides are only eliminated if present adjacent to TTTN PAM in non-target or human genome
+		###########################################################################################################################
+		# More lenient approach, where guides are only eliminated if present adjacent to TTTN PAM in non-target or human genome
 
-    ## Get kmers from non-target genomes to exclude if containing adjacent PAM
-    for i in fwd rev; do
-       	glistquery $KMER_OFFTARGET/combined_offtarget_"$kmerpam"_union.list -f guides_precheck/guides_pass_"$i"_pam.txt \
-       	--mismatch 2 | 
-       	awk -F "\t" '$2!=0 {print $1}' | 
-       	awk '{ $1 = substr($1, 5, "'$kmerpam'") } 1' | 
-       	sort | uniq > remove_nontargethits_"$i";
+	## Get kmers from non-target genomes to exclude if containing adjacent PAM
+	for i in fwd rev; do
+	   	glistquery $KMER_OFFTARGET/combined_offtarget_"$kmerpam"_union.list -f guides_precheck/guides_pass_"$i"_pam.txt \
+	   	--mismatch 2 | 
+	   	awk -F "\t" '$2!=0 {print $1}' | 
+	   	awk '{ $1 = substr($1, 5, "'$kmerpam'") } 1' | 
+	   	sort | uniq > remove_nontargethits_"$i";
 	done
 
 	## Remove guides present in the human genome with adjacent PAM
@@ -1187,59 +1213,59 @@ create_p3_input_pangenome() {
 		cut -f1-6 > $PANGENOME/guides_precheck/allgenes_lookup_pass_max5.tsv
 		split -l 500 $PANGENOME/guides_precheck/allgenes_lookup_pass_max5.tsv allgenes_subset -d
 
-        ## Number of gene-PAM pairs to decide on primer count to return
-        # local pairs=$(cut -f4 $PANGENOME/guides_precheck/allgenes_lookup_pass_max5.tsv | sort | uniq | wc -l)
+		## Number of gene-PAM pairs to decide on primer count to return
+		# local pairs=$(cut -f4 $PANGENOME/guides_precheck/allgenes_lookup_pass_max5.tsv | sort | uniq | wc -l)
 
-        # if [[ $pairs -gt 5000 ]]
-        # then
-        # 	local primercount=3
-        # else
-        # 	local primercount=5
-        # fi
+		# if [[ $pairs -gt 5000 ]]
+		# then
+		# 	local primercount=3
+		# else
+		# 	local primercount=5
+		# fi
 
-        for i in $(ls allgenes_subset* | awk -F "_" '{ print $2 }')
-        do
-        	while IFS=$'\t' read gene oligo pam seqname sequence target
-        	do
-                        #sequence=$(grep -w $seqname $OUTPUT/templates_lookup.tsv | cut -f2)
-                        {
-                        	echo "SEQUENCE_ID=$seqname"
-                        	echo "SEQUENCE_TEMPLATE=$sequence"
-                        	echo "SEQUENCE_INTERNAL_OLIGO=$oligo"
-                        	echo "PRIMER_TASK=pick_pcr_primers_and_hyb_probe"
-                        	echo "PRIMER_PICK_LEFT_PRIMER=1"
-                        	echo "PRIMER_PICK_INTERNAL_OLIGO=1"
-                        	echo "PRIMER_SECONDARY_STRUCTURE_ALIGNMENT=1"
-                        	echo "PRIMER_PICK_RIGHT_PRIMER=1"
-                        	echo "PRIMER_INTERNAL_MIN_SIZE=18"
-                        	echo "PRIMER_INTERNAL_MAX_SIZE=30"
-                        	echo "PRIMER_INTERNAL_OPT_SIZE=$kmer"
-                        	echo "PRIMER_MIN_SIZE=30"
-                        	echo "PRIMER_OPT_SIZE=32"
-                        	echo "PRIMER_MAX_SIZE=35"
-                        	echo "PRIMER_MAX_TM=100"
-                        	echo "PRIMER_MIN_TM=0"
-                        	echo "PRIMER_INTERNAL_MIN_TM=0"
-                        	echo "PRIMER_INTERNAL_MAX_TM=100"
-                        	echo "PRIMER_MIN_GC=30"
-                        	echo "PRIMER_MAX_GC=70"
-                                #echo "PRIMER_NUM_RETURN=$primercount"
-                                echo "PRIMER_MAX_NS_ACCEPTED=0"
-                                echo "SEQUENCE_TARGET=$target"
-                                echo "PRIMER_LOWERCASE_MASKING=1"
-                                echo "PRIMER_PRODUCT_SIZE_RANGE=90-300"
-                                echo "P3_FILE_FLAG=0"
-                                echo "PRIMER_EXPLAIN_FLAG=1"
-                                echo "="
-                        } >> p3_input/"$i".input.p3
-                        #awk '{ print "primer3_core < "'$P3_INPUT'"/"$i".input.p3 > "'$P3_OUTPUT'"/"$i".output.p3" }'
-                done < allgenes_"$i"
+		for i in $(ls allgenes_subset* | awk -F "_" '{ print $2 }')
+		do
+			while IFS=$'\t' read gene oligo pam seqname sequence target
+			do
+						#sequence=$(grep -w $seqname $OUTPUT/templates_lookup.tsv | cut -f2)
+						{
+							echo "SEQUENCE_ID=$seqname"
+							echo "SEQUENCE_TEMPLATE=$sequence"
+							echo "SEQUENCE_INTERNAL_OLIGO=$oligo"
+							echo "PRIMER_TASK=pick_pcr_primers_and_hyb_probe"
+							echo "PRIMER_PICK_LEFT_PRIMER=1"
+							echo "PRIMER_PICK_INTERNAL_OLIGO=1"
+							echo "PRIMER_SECONDARY_STRUCTURE_ALIGNMENT=1"
+							echo "PRIMER_PICK_RIGHT_PRIMER=1"
+							echo "PRIMER_INTERNAL_MIN_SIZE=18"
+							echo "PRIMER_INTERNAL_MAX_SIZE=30"
+							echo "PRIMER_INTERNAL_OPT_SIZE=$kmer"
+							echo "PRIMER_MIN_SIZE=30"
+							echo "PRIMER_OPT_SIZE=32"
+							echo "PRIMER_MAX_SIZE=35"
+							echo "PRIMER_MAX_TM=100"
+							echo "PRIMER_MIN_TM=0"
+							echo "PRIMER_INTERNAL_MIN_TM=0"
+							echo "PRIMER_INTERNAL_MAX_TM=100"
+							echo "PRIMER_MIN_GC=30"
+							echo "PRIMER_MAX_GC=70"
+								#echo "PRIMER_NUM_RETURN=$primercount"
+								echo "PRIMER_MAX_NS_ACCEPTED=0"
+								echo "SEQUENCE_TARGET=$target"
+								echo "PRIMER_LOWERCASE_MASKING=1"
+								echo "PRIMER_PRODUCT_SIZE_RANGE=90-300"
+								echo "P3_FILE_FLAG=0"
+								echo "PRIMER_EXPLAIN_FLAG=1"
+								echo "="
+						} >> p3_input/"$i".input.p3
+						#awk '{ print "primer3_core < "'$P3_INPUT'"/"$i".input.p3 > "'$P3_OUTPUT'"/"$i".output.p3" }'
+				done < allgenes_"$i"
 
-        done
+		done
 
-        [[ "$(ls -A p3_input)" ]] || error_exit "Failed to generate Primer3 input file(s)!"
-        rm allgenes_subset*
-        cd $OUTPUT
+		[[ "$(ls -A p3_input)" ]] || error_exit "Failed to generate Primer3 input file(s)!"
+		rm allgenes_subset*
+		cd $OUTPUT
 }
 
 
@@ -1272,58 +1298,58 @@ parse_p3_output_pangenome() {
 	cut -f1 allgenes.p3.out > genes.txt
 	awk -F "--" '{ print $1 }' genes.txt > genes_only.txt
 
-        # Revseq guide sequence 
-        local guideseq=$(cut -f5 allgenes.p3.out | \
-        	nl | \
-        	sed 's/^ */>seq/g' | \
-        	sed 's/\t/\n/g' | \
-        	seqkit seq -r -t DNA -v -p | \
-        	grep -v ">")
+		# Revseq guide sequence 
+		local guideseq=$(cut -f5 allgenes.p3.out | \
+			nl | \
+			sed 's/^ */>seq/g' | \
+			sed 's/\t/\n/g' | \
+			seqkit seq -r -t DNA -v -p | \
+			grep -v ">")
 
-        ## Create array from prev file; extract pam
-        local pam=$(awk -F "\t" 'FNR==NR{pam_lookup[$4]=$3; next} {print pam_lookup[$1]}' $PANGENOME/guides_precheck/allgenes_lookup_pass_max5.tsv genes.txt)
+		## Create array from prev file; extract pam
+		local pam=$(awk -F "\t" 'FNR==NR{pam_lookup[$4]=$3; next} {print pam_lookup[$1]}' $PANGENOME/guides_precheck/allgenes_lookup_pass_max5.tsv genes.txt)
 
-        ## Combine
-        paste allgenes.p3.out <(echo -e "$guideseq") <(echo -e "$pam") genes_only.txt --delimiters "\t" > allgenes_p3_parsed.tsv
-        rm genes_only.txt
+		## Combine
+		paste allgenes.p3.out <(echo -e "$guideseq") <(echo -e "$pam") genes_only.txt --delimiters "\t" > allgenes_p3_parsed.tsv
+		rm genes_only.txt
 
-        # Keep revcomp guide sequence for reverse strand guides
-        awk -F "\t" '{ if ($1 ~ /r$/) print $1,$13,$14,$15,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12; \
-        	else print $1,$5,$14,$15,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 }' OFS="\t" allgenes_p3_parsed.tsv \
-        > allgenes_primers_output.tsv
+		# Keep revcomp guide sequence for reverse strand guides
+		awk -F "\t" '{ if ($1 ~ /r$/) print $1,$13,$14,$15,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12; \
+			else print $1,$5,$14,$15,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 }' OFS="\t" allgenes_p3_parsed.tsv \
+		> allgenes_primers_output.tsv
 
 
-        ## Add header
-        local header=$(printf "%s\t" \
-        	"guide_set" \
-        	"guide_seq" \
-        	"pam" "gene" \
-        	"primer_set" \
-        	"fwd_primer" \
-        	"rev_primer" \
-        	"probe" \
-        	"fwd_primer_length" \
-        	"rev_primer_length" \
-        	"guide_length" \
-        	"fwd_primer_gc" \
-        	"rev_primer_gc" \
-        	"guide_gc" \
-        	"product_size" | sed 's/\t$//g')
+		## Add header
+		local header=$(printf "%s\t" \
+			"guide_set" \
+			"guide_seq" \
+			"pam" "gene" \
+			"primer_set" \
+			"fwd_primer" \
+			"rev_primer" \
+			"probe" \
+			"fwd_primer_length" \
+			"rev_primer_length" \
+			"guide_length" \
+			"fwd_primer_gc" \
+			"rev_primer_gc" \
+			"guide_gc" \
+			"product_size" | sed 's/\t$//g')
 
-        sed -i "1s/^/$header\n/" allgenes_primers_output.tsv
+		sed -i "1s/^/$header\n/" allgenes_primers_output.tsv
 
-        ## Summarize multiple guides per primer
-        cat allgenes_primers_output.tsv | \
-        csvtk summary -t -f guide_set:uniq,guide_set:countunique \
-        -g primer_set,fwd_primer,rev_primer \
-        > allgenes_primers_output_grouped.tsv
+		## Summarize multiple guides per primer
+		cat allgenes_primers_output.tsv | \
+		csvtk summary -t -f guide_set:uniq,guide_set:countunique \
+		-g primer_set,fwd_primer,rev_primer \
+		> allgenes_primers_output_grouped.tsv
 
-        ## Write guides with primers designed to file (this file is not used anywhere else )
-        cut -f2 allgenes_primers_output.tsv | grep -v guide | sort | uniq > $PRIMERS/allgenes_primers.tsv
+		## Write guides with primers designed to file (this file is not used anywhere else )
+		cut -f2 allgenes_primers_output.tsv | grep -v guide | sort | uniq > $PRIMERS/allgenes_primers.tsv
 
-        rm genes.txt #allgenes_p3_parsed.tsv revseq_input.txt 
+		rm genes.txt #allgenes_p3_parsed.tsv revseq_input.txt 
 
-        cd $OUTPUT
+		cd $OUTPUT
 
 }
 
@@ -1414,40 +1440,40 @@ process_cigar() {
 		# 	continue
 		# fi
 
-    	# Get the relevant columns
-    	read_name="${fields[0]}"
-    	cigar="${fields[5]}"
+		# Get the relevant columns
+		read_name="${fields[0]}"
+		cigar="${fields[5]}"
 
-    	# Check if the mapping is on the reverse strand
-    	is_reversed=false
-    	if (( ${fields[1]} & 16 )); then
-    		is_reversed=true
-    	fi
+		# Check if the mapping is on the reverse strand
+		is_reversed=false
+		if (( ${fields[1]} & 16 )); then
+			is_reversed=true
+		fi
 
-    	# Break down the CIGAR string into individual components
-    	components=()
-    	current_component=""
-    	for (( i=0; i<${#cigar}; i++ )); do
-    		char="${cigar:$i:1}"
-    		if [[ $char =~ [0-9] ]]; then
-    			current_component+=$char
-    		else
-    			components+=("$current_component$char")
-    			current_component=""
-    		fi
-    	done
+		# Break down the CIGAR string into individual components
+		components=()
+		current_component=""
+		for (( i=0; i<${#cigar}; i++ )); do
+			char="${cigar:$i:1}"
+			if [[ $char =~ [0-9] ]]; then
+				current_component+=$char
+			else
+				components+=("$current_component$char")
+				current_component=""
+			fi
+		done
 
-    	 # Generate the expanded CIGAR string
-    	 expanded_string=""
-    	 num_X=0
-    	 for component in "${components[@]}"; do
-    	 	count="${component%[=X]}"
-    	 	op="${component: -1}"
-    	 	expanded_string+=$(printf "$op%.0s" $(seq 1 "$count"))
-    	 	if [[ $op == "X" ]]; then
-    	 		num_X=$((num_X + count))
-    	 	fi
-    	 done
+		 # Generate the expanded CIGAR string
+		 expanded_string=""
+		 num_X=0
+		 for component in "${components[@]}"; do
+		 	count="${component%[=X]}"
+		 	op="${component: -1}"
+		 	expanded_string+=$(printf "$op%.0s" $(seq 1 "$count"))
+		 	if [[ $op == "X" ]]; then
+		 		num_X=$((num_X + count))
+		 	fi
+		 done
 
 	# Reverse the expanded string if the mapping is on the reverse strand
 	if $is_reversed; then
@@ -1505,18 +1531,6 @@ guide_specificity() {
 		rm $file
 	done
 
-	# logger "Parsing guide alignments to off-target genomes"
-	# cd $PRIMERS/guide_specificity
-
-	# # Process CIGAR string within SAM alignments
-	# cat "$OUTPUT"/genomes_offtarget.txt |
-	# awk '{ print $0"_wg.sam" }' |
-	# parallel -j "$MAX_JOBS" 'process_cigar {} | awk "{ print \"{}\", \$0 }" OFS="\t" | sed "s/_wg.sam//g" > "{}".parsed; rm "{}"' 
-
-	# find . -name "*.parsed" -type f -print0 | xargs -0 -n100 cat >> allguides_hits_offtarget_genomes.tsv
-	# find . -name "*.parsed" | xargs rm
-
-	###loop ends here
 	##################################################################################
 	[[ -s "$PRIMERS/guide_specificity/allguides_hits_offtarget_genomes.tsv" ]] || { logger "No guides mapped to off-target genomes"; return; }
 
@@ -1529,11 +1543,7 @@ guide_specificity() {
 	print $0, mm_pam, mm_seed, mm_distal }' allguides_hits_offtarget_genomes_split.tsv | \
 	awk -F "\t" '$3<=5' | \
 	awk -F "\t" '{ if ($7==0 && $8==0) print $0, "offtarget"; else print $0, "ok" }' OFS="\t" > allguides_hits_offtarget_genomes_split.tsv2
-	# awk -F "\t" '$3<=5' | awk -F "\t" '{ if ($7+$8>=2) print $0, "ok"; \
-	# else if ($9>3) print $0, "ok"; \
-	# else if ($7==0 && $8==0 && $9<=3) print $0, "offtarget"; \
-	# else if ($7==1 && $8==0 && $9<=3) print $0, "offtarget"; \
-	# else if ($7==0 && $8==1 && $9<=3) print $0, "offtarget" }' OFS="\t" > allguides_hits_offtarget_genomes_split.tsv2
+	
 	mv allguides_hits_offtarget_genomes_split.tsv2 allguides_hits_offtarget_genomes_split.tsv
 
 	sed -i '1i genome\tguide\tmismatch_count\tcigar_pam\tcigar_seed\tcigar_distal\tmm_pam\tmm_seed\tmm_distal\tremarks' allguides_hits_offtarget_genomes_split.tsv
@@ -1592,7 +1602,7 @@ get_kmers_offtarget() {
 	fi
 
 	cd $OUTPUT
-       	
+	   	
 }
 
 
@@ -1869,36 +1879,16 @@ get_uniq_target_kmer_withpam() {
 	## Get substring of k=22
 	## Query against non-target genomes and exclude those present in non-target genomes
 	
-	#kmerpam=$(grep -v "#" $OUTPUT/$IN | grep kmer | awk -F "|" '{ print $2+4}')
-	#threshold=$(grep -v "#" $OUTPUT/$IN | grep threshold | awk -F "|" '{ print $2 }')
-
-	# ## Exclude queries not present in combined_target_pam union list file
-	# logger "Excluding k="$kmerpam" k-mers if not present in target-unique shortlisted set"
-	# glistquery $KMER_TARGET_PAM/combined_target_pam*union.list |
-	# 	egrep -v "NUnique|NTotal" |
-	# 	cut -f1 > $KMER_TARGET_PAM/combined_target_pam_present.txt
-
-	# cat $KMER_TARGET/query_withpam.txt | split -l 200000 -d - $KMER_TARGET/withpam
-
-	# ## Instead of using grep, can we use glistquery here??
-	# for i in $KMER_TARGET/withpam*
-	# do
-	# 	grep -wF -f $i $KMER_TARGET_PAM/combined_target_pam_present.txt \
-	# 	>> $KMER_TARGET/query_kmer80pct_filter2_withpam_filtered.txt
-	# done
-
-	# rm $KMER_TARGET/withpam*
-
 	## Exclude queries not present in combined_target_pam union list file (using glistquery method)
 	## This includes filtering for minimum count using --minfreq option, reducing computational time (use 50% as default here)
 	cd $OUTPUT
 
 	if [[ "$subsample" == "no" ]]
 	then
-		local targetcount=$(wc -l $OUTPUT/genomes_target.txt | awk '{ print $1 }')
+		local targetcount=$(wc -l <$OUTPUT/genomes_target.txt)
 		local myfile=$OUTPUT/genomes_target.txt
 	else
-		local targetcount=$(wc -l $OUTPUT/genomes_target_subsample.txt | awk '{ print $1 }')
+		local targetcount=$(wc -l <$OUTPUT/genomes_target_subsample.txt)
 		local myfile=$OUTPUT/genomes_target_subsample.txt
 	fi
 
@@ -2228,68 +2218,10 @@ split_amplicons() {
 				#awk -F "\t" '{ if (NF==3) print $1"__"$2"_"$3; else print $1"__"$2 }' > "$i".sorted
 		done
 
-	
-		# cd $AMPLICON
-		# for i in $ALIGN_OUT/*.headers.sorted
-		# do
-		# 	awk -F "\t" '{ print >> $2 }' $i
-		# done
-
-		## Replace tabs in guide files
-		# for i in g*; do awk -F "\t" '{ if (NF==3) print $1"__"$2"_"$3; else print $1"__"$2 }' $i > "$i".2; mv "$i".2 $i; done
-
-		# #rm $ALIGN_OUT/*.headers*
-		# logger "Splitting amplicons into individual guide fastas"
-		# find . -type f -name "g*" -printf '%f\n' > list
-		# parallel -a list -j 20 'for subset in '"$ALIGN_OUT"'/sub*.cidx; do cat "{}" | cdbyank "$subset" >> "{}".fasta; done'
-		# find . -type f -name "g*" -printf '%f\n' | grep -v fasta | xargs rm
-
-	
-	# elif [[ -s $ALIGN_OUT/combined_templates.fasta && $(grep -c ">" $ALIGN_OUT/combined_templates.fasta) -le 1000000 ]]
-	# 	then
-	# 	## keep individual files to speed up primersearch
-	# 	#find $ALIGN_OUT -type f -name "*_template.fasta" -printf '%p\n' | xargs -r rm
-	# 	cdbfasta $ALIGN_OUT/combined_templates.fasta
-	# 	grep ">" $ALIGN_OUT/combined_templates.fasta | sed 's/>//g' > $ALIGN_OUT/headers
-		
-	# 	sed 's/__/\t/1' $ALIGN_OUT/headers | awk 'BEGIN{FS=OFS="\t"} {gsub(/_/, "\t", $2)} 1' | \
-	# 	sort -k2,2 > $ALIGN_OUT/headers.sorted
-
-	# 	cd $OUTPUT
-
-		# cd $AMPLICON
-		# awk -F "\t" '{print >> $2}' $ALIGN_OUT/headers.sorted
-		# for i in g*; do awk -F "\t" '{ if (NF==3) print $1"__"$2"_"$3; else print $1"__"$2 }' $i > "$i".2; mv "$i".2 $i; done
-		
-		# logger "Splitting amplicons into individual guide fastas"
-		# find . -type f -name "g*" -printf '%f\n' > list
-		# parallel -a list -j "$MAX_JOBS" 'cat "{}" | cdbyank '"$ALIGN_OUT"'/combined_templates.fasta.cidx > "{}".fasta; rm "{}"'
-		# cd $OUTPUT
 	else
 		error_exit "Combined templates fasta file not found!"
 	fi
 
-	# ## Split into individual guide fastas here
-
-	# cd $AMPLICON
-	# grep ">" $ALIGN_OUT/combined_templates.fasta | sed 's/>//g' > headers
-	# sort -t " " -k2,2 headers > headers.sorted
-	# awk '{print>""'$AMPLICON'"/"$2}' headers.sorted
-	# rm headers*
-
-	# find . -type f -name "g*" -printf '%f\n' > list
-	# cat list | parallel -j 20 'cat "{}" | cdbyank ../align_out/*.cidx > "{}".fasta; rm "{}"'
-
-	# cd $OUTPUT
-
-	# Alternative: This takes very long if large number of target sequences + guides
-	# mkdir $AMPLICON
-	# seqkit split $ALIGN_OUT/combined_templates.fasta --by-id --id-regexp "\s(.*)" --two-pass --out-dir $AMPLICON
-
-	# cd $ALIGN_OUT
-	#seqkit split split_fasta/combined_templates.part_"{}".fasta --by-id --id-regexp "\s(.*)" --two-pass --out-dir $AMPLICON
-
-	#seqkit grep --id-regexp '^(.+)::' -f ids.txt GCF_001712975.1_template.fasta
 	cd $OUTPUT
 }
 
@@ -2321,16 +2253,16 @@ process_individual_guides() {
 
 		#Replace tab
 		find . -maxdepth 1 -type f -name "g*" -print0 | parallel -0 -j "$MAX_JOBS" \
-    		'awk -F "\t" '\''{ if (NF == 3) print $1 "__" $2 "_" $3; else print $1 "__" $2 }'\'' {} > {}.2 && mv {}.2 {}'
+			'awk -F "\t" '\''{ if (NF == 3) print $1 "__" $2 "_" $3; else print $1 "__" $2 }'\'' {} > {}.2 && mv {}.2 {}'
 
-    		#Extract sequences
-    		parallel -a "$i" -j "$MAX_JOBS" 'for subset in '"$ALIGN_OUT"'/sub*.cidx; do cat "{}" | \
-    		cdbyank "$subset" >> "{}".fasta; rm "{}"; done'
+		#Extract sequences
+		parallel -a "$i" -j "$MAX_JOBS" 'for subset in '"$ALIGN_OUT"'/sub*.cidx; do cat "{}" | \
+		cdbyank "$subset" >> "{}".fasta; rm "{}"; done'
 
-    		#Cluster sequences
-    		#logger "Clustering guide amplicons with cd-hit"
-    		parallel -a "$i" -j "$MAX_JOBS" 'cd-hit-est -i "{}".fasta -T '"$MAX_THREADS_PER_JOB"' \
-    		-c 0.90 -n 9 -g 1 -d 1000 -M 32000 -o "{}".cdhit; \
+		#Cluster sequences
+		#logger "Clustering guide amplicons with cd-hit"
+		parallel -a "$i" -j "$MAX_JOBS" 'cd-hit-est -i "{}".fasta -T '"$MAX_THREADS_PER_JOB"' \
+		-c 0.90 -n 9 -g 1 -d 1000 -M 32000 -o "{}".cdhit; \
 		make_multi_seq2.pl "{}".fasta "{}".cdhit.clstr alignments '"$cluster_cutoff"' "{}"; \
 		rm "{}".fasta; rm "{}".cdhit; rm "{}".cdhit.clstr'
 
@@ -2422,49 +2354,39 @@ create_p3_input() {
 		error_exit "File guide_lookup_final.txt is missing"
 	fi
 
-	## Decide on #primers to return
-	# local guidecount=$(wc -l $AMPLICON/guides_lookup_final.txt)
-	
-	# if [[ $guidecount -gt 5000 ]]
-	# then
-	# 	local primercount=3
-	# else
-	# 	local primercount=5
-	# fi
-
 	for i in $(ls guides_subset* | awk -F "_" '{ print $2 }')
 	do
 		while IFS=$'\t' read guide oligo sequence target
 		do
 			{
-			        echo "SEQUENCE_ID=$guide"
-			        echo "SEQUENCE_TEMPLATE=$sequence"
+				echo "SEQUENCE_ID=$guide"
+				echo "SEQUENCE_TEMPLATE=$sequence"
 				echo "SEQUENCE_INTERNAL_OLIGO=$oligo"
-			        echo "PRIMER_TASK=pick_pcr_primers_and_hyb_probe"
-			        echo "PRIMER_PICK_LEFT_PRIMER=1"
-			        echo "PRIMER_PICK_INTERNAL_OLIGO=1"
-			        echo "PRIMER_SECONDARY_STRUCTURE_ALIGNMENT=1"
-			        echo "PRIMER_PICK_RIGHT_PRIMER=1"
-			        echo "PRIMER_INTERNAL_MIN_SIZE=18"
-			        echo "PRIMER_INTERNAL_MAX_SIZE=30"
+				echo "PRIMER_TASK=pick_pcr_primers_and_hyb_probe"
+				echo "PRIMER_PICK_LEFT_PRIMER=1"
+				echo "PRIMER_PICK_INTERNAL_OLIGO=1"
+				echo "PRIMER_SECONDARY_STRUCTURE_ALIGNMENT=1"
+				echo "PRIMER_PICK_RIGHT_PRIMER=1"
+				echo "PRIMER_INTERNAL_MIN_SIZE=18"
+				echo "PRIMER_INTERNAL_MAX_SIZE=30"
 				echo "PRIMER_INTERNAL_OPT_SIZE=$kmer"
-			        echo "PRIMER_MIN_SIZE=30"
-			        echo "PRIMER_OPT_SIZE=32"
-			        echo "PRIMER_MAX_SIZE=35"
-			        echo "PRIMER_MAX_TM=100"
-			        echo "PRIMER_MIN_TM=0"
-			        echo "PRIMER_INTERNAL_MIN_TM=0"
-			        echo "PRIMER_INTERNAL_MAX_TM=100"
-			        echo "PRIMER_MIN_GC=30"
+				echo "PRIMER_MIN_SIZE=30"
+				echo "PRIMER_OPT_SIZE=32"
+				echo "PRIMER_MAX_SIZE=35"
+				echo "PRIMER_MAX_TM=100"
+				echo "PRIMER_MIN_TM=0"
+				echo "PRIMER_INTERNAL_MIN_TM=0"
+				echo "PRIMER_INTERNAL_MAX_TM=100"
+				echo "PRIMER_MIN_GC=30"
 				echo "PRIMER_MAX_GC=70"
 				#echo "PRIMER_NUM_RETURN=$primercount"
-			        echo "PRIMER_MAX_NS_ACCEPTED=0"
-			        echo "SEQUENCE_TARGET=$target"
-			        echo "PRIMER_LOWERCASE_MASKING=1"
-			        echo "PRIMER_PRODUCT_SIZE_RANGE=90-300"
-			        echo "P3_FILE_FLAG=0"
-			        echo "PRIMER_EXPLAIN_FLAG=1"
-			        echo "="
+				echo "PRIMER_MAX_NS_ACCEPTED=0"
+				echo "SEQUENCE_TARGET=$target"
+				echo "PRIMER_LOWERCASE_MASKING=1"
+				echo "PRIMER_PRODUCT_SIZE_RANGE=90-300"
+				echo "P3_FILE_FLAG=0"
+				echo "PRIMER_EXPLAIN_FLAG=1"
+				echo "="
 			} >> $PRIMERS/p3_input/"$i".input.p3
 		done < guides_"$i"
 	done
@@ -2527,36 +2449,16 @@ parse_p3_output() {
 
 
 	cut -f1 allguides.p3.out | awk -F "_" '{ print $1 }' > guides.txt
-
-	# 0525- this is not needed
-	# local guideseq=$(cut -f5 allguides.p3.out | \
-	# 	nl | \
-	# 	sed 's/^ */>seq/g' | \
-	# 	sed 's/\t/\n/g' | \
-	# 	seqkit seq -r -t DNA -v -p | \
-	# 	grep -v ">")
 	
 	## Associative array from prev file; extract pam
 	local pam=$(awk -F "\t" 'FNR==NR{pam_lookup[$1]=$2; next} {print pam_lookup[$1]}' "$KMER_FINAL"/uniq_target_kmers_final_prevalence.tsv guides.txt)
-	
-	## Combine
-	#paste allguides.p3.out guides.txt <(echo -e "$guideseq") <(echo -e "$pam") --delimiters "\t" > allguides_p3_parsed.tsv
-	## Need to put guide seq after probe seq column, add pam
 
-	## Combine (0523)
+	## Combine
 	paste allguides.p3.out guides.txt <(echo -e "$pam") --delimiters "\t" > allguides_p3_parsed.tsv
 
 	## Need to put guide seq after probe seq column, add pam
-	
-	## Add header
-	# local header=$(printf "%s\t" "guide_set" "primer_set" "fwd_primer" \
-	# 	"rev_primer" "probe" "fwd_primer_length" \
-	# 	"rev_primer_length" "guide_length" "fwd_primer_gc" \
-	# 	"rev_primer_gc" "guide_gc" "product_size" \
-	# 	"guide" "guide_seq" "pam")
-	# sed -i "1s/^/$header\n/" allguides_p3_parsed.tsv
 
-	## Add header (0523)
+	## Add header
 	local header=$(printf "%s\t" \
 		"guide_set" \
 		"primer_set" \
@@ -2573,15 +2475,8 @@ parse_p3_output() {
 		"guide" "pam")
 	sed -i "1s/^/$header\n/" allguides_p3_parsed.tsv
 
-
-	## Rearrange columns
-	# awk -F "\t" '{ print $1,$13,$14,$15,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12 }' OFS="\t" allguides_p3_parsed.tsv \
-	# 	> allguides_primers_output.tsv
-
-	# 0523
 	awk -F "\t" '{ print $1,$13,$5,$14,$2,$3,$4,$6,$7,$8,$9,$10,$11,$12 }' OFS="\t" allguides_p3_parsed.tsv \
 		> allguides_primers_output.tsv
-
 
 	## Summarize multiple guides per primer
 	cat allguides_primers_output.tsv | \
@@ -2713,14 +2608,6 @@ run_fast_ispcr() {
 	# ispcr_input.tsv \
 	# nontarget_amplicons/"{}".amplicons'
 
-
-	# Combine amplicons for Cas13 step
-	#find target_amplicons -type f -exec cat {} \; > combined_target_amplicons.fasta
-	#find target_amplicons -type f -print | xargs file | grep ASCII | cut -d: -f1 | xargs cat > combined_target_amplicons.fasta
-
-	# tar cf - nontarget_amplicons --remove-files | pigz -9 -p 16 > nontarget_amplicons.tar.gz
-	# tar cf - target_amplicons --remove-files | pigz -9 -p 16 > target_amplicons.tar.gz
-
 	## Combine all nontarget output
 	cd nontarget
 	for i in *.ispcr; do awk '{ print FILENAME, $0, $3-$2 }' OFS="\t" $i | sed 's/.ispcr//g' >> combined_ispcr.txt; done
@@ -2736,66 +2623,11 @@ run_fast_ispcr() {
 
 
 
-##Not used
-primer_orientation_cas13() {
-	# For each primer/guide set designed, check if usable for Cas13a application
-	# Guide RNA should be in the same orientation as reverse primer
-	# Output new column "cas13a_use"- "yes" if can be used as-is, "reverse" if primers have to be swapped
-
-	cd $PRIMERS/primer_check
-
-	# Deduplicate combined target amplicons
-	#cd-hit-est -c 1 -T 16 -r 0 -aS 1 -aL 1 -d 200 -M 32000 -i combined_target_amplicons.fasta -o combined_target_amplicons.fasta.rmdup
-	
-	# Rename headers and remove sequences with non-acgt chars
-	awk '/^>/{split($0, a, " "); print ">" a[2]; next} 1' combined_target_amplicons.fasta > output.fasta
-	seqkit fx2tab -j "$MAX_JOBS" output.fasta | sed 's/ //g' > combined_target_amplicons.tab
-	seqkit tab2fx -j "$MAX_JOBS" combined_target_amplicons.tab -o combined_target_amplicons.fasta
-
-	# Split into individual primer sets and deduplicate
-	seqkit split -j 16 --by-id --by-id-prefix set combined_target_amplicons.fasta -O amplicons_split
-	cd amplicons_split
-	find . -type f -printf "%f\n" > list
-
-	cat list | parallel -j "$MAX_PARALLEL_JOBS" \
-	'seqkit rmdup -j 8 -s "{}" -o "{}".rmdup; rm "{}"'
-
-	find . -name "*.rmdup" -exec cat {} + > $PRIMERS/primer_check/combined_target_amplicons_derep.fasta
-	cd  $PRIMERS/primer_check
-	rm -rf combined_target_amplicons.tab amplicons_split
-
-	bbmap.sh \
-	in="$PRIMERS"/guides_input_pam.fasta \
-	nodisk \
-	noheader=t \
-	threads="$MAX_JOBS" \
-	ref=combined_target_amplicons_derep.fasta \
-	ambig=all \
-	vslow \
-	perfectmode \
-	maxsites=10000000 \
-	out=stdout >> combined_target_amplicons.sam
-
-	cut -f1-3 combined_target_amplicons.sam | 
-	awk '{ print $1, $2, $3 }' OFS="\t" | 
-	sort | uniq |
-	awk -F "\t" '{ if ($2==0||$2==256) print $1, $3, "swap primers"; else if ($2==16||$2==272) print $1, $3, "yes" }' OFS="\t" |
-	sort | uniq > primer_cas13a_compatibility.tsv
-
-	sed -i '1i guide\tprimerset\tprimer_cas13a_compatibility' primer_cas13a_compatibility.tsv
-	#rm combined_target_amplicons.sam combined_target_amplicons_derep.fasta
-
-	cd $OUTPUT
-
-}
-
-
-
 get_primerstats() {
 	cd $PRIMERS
 	
-	local targetcount=$(wc -l $OUTPUT/genomes_target.txt | awk '{ print $1 }')
-	local nontargetcount=$(wc -l $OUTPUT/genomes_offtarget.txt | awk '{ print $1 }')
+	local targetcount=$(wc -l <$OUTPUT/genomes_target.txt)
+	local nontargetcount=$(wc -l <$OUTPUT/genomes_offtarget.txt)
 	
 	local targetcheck=primer_check/target
 	local nontargetcheck=primer_check/nontarget
@@ -2814,84 +2646,53 @@ get_primerstats() {
 		#local cas13=$PRIMERS/primer_check/primer_cas13a_compatibility.tsv
 	fi
 
-	#if [[ -s "$targetcheck"/all_ontarget_parsed.tsv && -s "$nontargetcheck"/all_nontarget_parsed.tsv ]]
-	if [[ -s "$nontargetcheck"/all_nontarget_parsed.tsv && -s guide_offtarget_summary.tsv ]]
+	if [[ -s "$nontargetcheck"/all_nontarget_parsed.tsv ]]
 	then
-		logger "Calculating primer sensitivity and specificity (with guide offtarget hits)"
-		get_primerstats.R "$targetcheck"/all_ontarget_parsed.tsv \
-			"$nontargetcheck"/all_nontarget_parsed.tsv \
-			primer_check/ispcr_input.tsv \
-			$targetcount \
-			$nontargetcount \
-			$myfile \
-			$OUTPUT/pathogd_primers_stats.tsv \
-			$PRIMERS/allguides_target_summary.tsv \
-			$PRIMERS/guide_offtarget_summary.tsv \
-			$annot \
-			$method
+		
+		if [[ -s guide_offtarget_summary.tsv ]]
+		then
+			logger "Calculating primer sensitivity and specificity (with guide offtarget hits)"
+			offtarget="$nontargetcheck"/all_nontarget_parsed.tsv
+			offtarget_summary=$PRIMERS/guide_offtarget_summary.tsv
+		else
+			logger "Calculating primer sensitivity and specificity (no guide offtarget hits)"
+			offtarget="$nontargetcheck"/all_nontarget_parsed.tsv
+			offtarget_summary=NULL
+		fi
 	
-	#elif [[ -s "$targetcheck"/all_ontarget_parsed.tsv && ! -s "$nontargetcheck"/all_nontarget_parsed.tsv ]]
-	elif [[ ! -s "$nontargetcheck"/all_nontarget_parsed.tsv && -s guide_offtarget_summary.tsv ]]
-	then
-		logger "No amplified sequences from non-target genomes (with guide offtarget hits)"
-		logger "Calculating primer sensitivity"
-		get_primerstats.R "$targetcheck"/all_ontarget_parsed.tsv \
-			NULL \
-			primer_check/ispcr_input.tsv \
-			$targetcount \
-			$nontargetcount \
-			$myfile \
-			$OUTPUT/pathogd_primers_stats.tsv \
-			$PRIMERS/allguides_target_summary.tsv \
-			$PRIMERS/guide_offtarget_summary.tsv \
-			$annot \
-			$method
-
-	elif [[ -s "$nontargetcheck"/all_nontarget_parsed.tsv && ! -s guide_offtarget_summary.tsv ]]
-	then
-		logger "Calculating primer sensitivity and specificity (no guide offtarget hits)"
-		get_primerstats.R "$targetcheck"/all_ontarget_parsed.tsv \
-			"$nontargetcheck"/all_nontarget_parsed.tsv \
-			primer_check/ispcr_input.tsv \
-			$targetcount \
-			$nontargetcount \
-			$myfile \
-			$OUTPUT/pathogd_primers_stats.tsv \
-			$PRIMERS/allguides_target_summary.tsv \
-			NULL \
-			$annot \
-			$method
-
-	elif [[ ! -s "$nontargetcheck"/all_nontarget_parsed.tsv && ! -s guide_offtarget_summary.tsv ]]
-	then
-		logger "No amplified sequences from non-target genomes (no guide offtarget hits)"
-		logger "Calculating primer sensitivity"
-		get_primerstats.R "$targetcheck"/all_ontarget_parsed.tsv \
-			NULL \
-			primer_check/ispcr_input.tsv \
-			$targetcount \
-			$nontargetcount \
-			$myfile \
-			$OUTPUT/pathogd_primers_stats.tsv \
-			$PRIMERS/allguides_target_summary.tsv \
-			NULL \
-			$annot \
-			$method
 	else
-		error_exit "No primer hits to parse"
+		echo "No amplified sequences from non-target genomes"
+		logger "Calculating primer sensitivity"
+		if [[ -s guide_offtarget_summary.tsv ]]
+		then
+			offtarget=NULL
+			offtarget_summary=$PRIMERS/guide_offtarget_summary.tsv
+		else
+			offtarget=NULL
+			offtarget_summary=NULL
+		fi
 	fi
 
+	get_primerstats.R "$targetcheck"/all_ontarget_parsed.tsv \
+		$offtarget \
+		$PRIMERS/primer_check/ispcr_input.tsv \
+		$targetcount \
+		$nontargetcount \
+		$myfile \
+		$OUTPUT/pathogd_primers_stats.tsv \
+		$PRIMERS/allguides_target_summary.tsv \
+		$offtarget_summary \
+		$annot \
+		$method
+		
 }
 
-
+	
 
 clean_files() {
 	
 	logger "Cleaning up intermediate files"
 	local method=$1
-
-	#find $GENOMES_TARGET -type f -name "*.fna" | parallel -j 16 gzip --best
-	#find $GENOMES_OFFTARGET -type f -name "*.fna" | parallel -j 16 gzip --best
 	
 	if [[ $method == "pangenome" ]]
 	then
