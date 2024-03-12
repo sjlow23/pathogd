@@ -149,6 +149,7 @@ done < "$OUTPUT"/params.tsv
 
 kmerpam=$((kmer + 4))
 
+
 target=$target_species 
 target_taxid=$target_species_taxid
 offtarget=$offtarget_species
@@ -218,11 +219,13 @@ check_assemblies_taxid() {
 		fi
 	fi
 
-	if [[ -n "$target_taxid" && -n "$offtarget_taxid" ]]; then
-		
+	if [[ -n "$target_taxid" ]]; then
 		# Get all children species taxids under user-provided parent taxids
-		taxonkit --data-dir $TAXONKIT_DB list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
-		taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
+		taxonkit --data-dir $TAXONKIT_DB list --ids "$target_species_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
+	fi
+
+	if [[ -n "$offtarget_taxid" ]]; then
+		taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_species_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 	fi
 
 	# Subsample where necessary and generate download script
@@ -274,13 +277,13 @@ check_assemblies_taxid() {
 		elif [[ -s sample.txt && ! -s keep.txt ]]
 		then
 			logger "Subsampling to a maximum of 1000 target genomes per target species"
-			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -v id={} '\$7 == id {print}' target_"$db".txt | shuf -n 1000" | cut -f20 |
+			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F "\t" -v id={} '\$7 == id {print}' target_"$db".txt | shuf -n 1000" | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' > wget_target_"$db".sh
 			rm sample.txt
 
 		elif [[ -s keep.txt && ! -s sample.txt ]]
 		then
-			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt target_"$db".txt | cut -f20 |
+			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt FS="\t" target_"$db".txt | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' > wget_target_"$db".sh
 			rm keep.txt
 		fi
@@ -294,10 +297,11 @@ check_assemblies_taxid() {
 		# if using species name
 		else
 			if [[ "$offtarget" == *,* ]]; then
-				offtarget_taxa=$(echo "offtarget_taxa" | sed 's/,/|/g')
+				#offtarget_taxa=$(echo "$offtarget_taxa" | sed 's/,/|/g')
+				offtarget_taxa=$(sed 's/,/|/g' <<< "$offtarget_species")
 				egrep -w "$offtarget_taxa" "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
 			else
-				grep -w "$offtarget" "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
+				grep -w "$offtarget_species" "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
 			fi
 		fi
 
@@ -319,23 +323,23 @@ check_assemblies_taxid() {
 			#awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' sample.txt offtarget_"$db".txt | shuf -n 100 > offtarget_"$db"_subsampled.txt
 			#awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt offtarget_"$db".txt >> offtarget_"$db"_subsampled.txt
 			logger "Subsampling to a maximum of 100 genomes per non-target species"
-			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -v id={} '\$7 == id {print}' offtarget_"$db".txt | shuf -n 100" | cut -f20 |
+			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F "\t" -v id={} '\$7 == id {print}' offtarget_"$db".txt | shuf -n 100" | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' > wget_offtarget_"$db".sh
 
-			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt offtarget_"$db".txt | cut -f20 |
+			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt FS="\t" offtarget_"$db".txt | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' >> wget_offtarget_"$db".sh
 			rm sample.txt keep.txt
 
 		elif [[ -s sample.txt && ! -s keep.txt ]]
 		then
 			logger "Subsampling to a maximum of 100 genomes per non-target species"
-			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -v id={} '\$7 == id {print}' offtarget_"$db".txt | shuf -n 100" | cut -f20 |
+			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F "\t" -v id={} '\$7 == id {print}' offtarget_"$db".txt | shuf -n 100" | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' > wget_offtarget_"$db".sh
 			rm sample.txt
 
 		elif [[ -s keep.txt && ! -s sample.txt ]]
 		then
-			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt offtarget_"$db".txt | cut -f20 |
+			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt FS="\t" offtarget_"$db".txt | cut -f20 |
 			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' > wget_offtarget_"$db".sh
 			rm keep.txt
 		fi
