@@ -23,36 +23,44 @@ PathoGD will design guide RNAs that are specific to the target taxa, with at lea
    ```sh
    git clone https://github.com/sjlow23/pathogd.git
    ```
-2. Create a conda environment using the `pathogd.yml` file provided.
 
-   _Installing to default conda environment path:_
+2. Create a new empty conda environment
+   
+      _Use default conda environment path:_
    ```sh
-   conda env create -n pathogd -f pathogd.yaml
+   conda env create -n pathogd
    ```
 
-   _Installing to user-specified directory:_
+   _Create in user-specified directory:_
    ```sh
-   conda env create --prefix /dir/to/pathogd -f pathogd.yaml
+   conda create --prefix /dir/to/pathogd
    ```
-3. Activate conda environment
-
+   
+3. Activate the conda environment
    ```sh
    conda activate pathogd
    conda activate /dir/to/pathogd
    ```
 
-4. Move scripts into bin directory of conda environment
+4. Install required packages using the `pathogd.yaml` file provided.
+
+   ```sh
+   conda env update --name pathogd --file pathogd.yaml 
+   conda env update --prefix /dir/to/pathogd --file pathogd.yaml
+   ```
+
+5. Move scripts into bin directory of conda environment
    ```sh
    mv pathogd $CONDA_PREFIX/bin/
    mv scripts/* $CONDA_PREFIX/bin/
    ```
 
-5. Make scripts executable
+6. Make scripts executable
    ```sh
    chmod u+x $CONDA_PREFIX/bin/pathogd $CONDA_PREFIX/bin/*.R
    ```
 
-6. You will also need Prokka and Roary installed on your system and in your `PATH`. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
+7. You will also need Prokka and Roary installed on your system and in your `PATH`. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
 
 
 <p align="right">(<a href="#installation-top">back to top</a>)</p>
@@ -174,7 +182,7 @@ If your target or non-target taxa includes multiple species, *eg.* all species b
 
   Specifying just the parent taxid will be sufficient as the pipeline will search for all children taxa.
 
-   **c) Input taxids appropriate fields in config file**
+   **c) Input taxids in the appropriate fields in config file**
 
    **d) Run the following command:**
 
@@ -218,7 +226,7 @@ Use this to automatically download genome assemblies for target and/or non-targe
 
    **Important notes:**
 
-   1. No subsampling is performed for both target and non-target taxa using this workflow. If specifying species with a large number of genome assemblies, *eg.* *Escherichia coli*, all genomes will be downloaded which may not be ideal if there is insufficient storage.
+   1. No subsampling is performed for both target and non-target taxa using this workflow. If specifying species with a large number of genome assemblies, *eg.* *Escherichia coli*, all genomes will be downloaded which may not be ideal if there is insufficient storage space.
 
    2. To prevent this, use the `check` workflow.
 
