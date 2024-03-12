@@ -49,18 +49,14 @@ PathoGD will design guide RNAs that are specific to the target taxa, with at lea
    conda env update --prefix /dir/to/pathogd --file pathogd.yaml
    ```
 
-5. Move scripts into bin directory of conda environment
+5. Make scripts executable and move into bin directory of conda environment
    ```sh
+   chmod u+x scripts/*
    mv pathogd $CONDA_PREFIX/bin/
    mv scripts/* $CONDA_PREFIX/bin/
    ```
 
-6. Make scripts executable
-   ```sh
-   chmod u+x $CONDA_PREFIX/bin/pathogd $CONDA_PREFIX/bin/*.R
-   ```
-
-7. You will also need Prokka and Roary installed on your system and in your `PATH`. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
+6. You will also need Prokka and Roary installed on your system and in your `PATH`. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
 
 
 <p align="right">(<a href="#installation-top">back to top</a>)</p>
