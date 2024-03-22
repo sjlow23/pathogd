@@ -22,6 +22,7 @@ PathoGD will design guide RNAs that are specific to the target taxa, with at lea
 1. Clone the repo into your working directory
    ```sh
    git clone https://github.com/sjlow23/pathogd.git
+   cd pathogd
    ```
 
 2. Create a new empty conda environment
