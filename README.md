@@ -29,7 +29,7 @@ PathoGD will design guide RNAs that are specific to the target taxa, with at lea
    
       _Use default conda environment path:_
    ```sh
-   conda env create -n pathogdenv
+   conda create -n pathogdenv
    ```
 
    _Create in user-specified directory:_
