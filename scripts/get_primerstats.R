@@ -4,7 +4,7 @@ library(data.table)
 library(dplyr)
 library(tidyr)
 library(stringr)
-library(argparse)
+#library(argparse)
 #library(ggplot2)
 
 #$1: primersearch target parsed output file
