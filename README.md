@@ -54,7 +54,6 @@ PathoGD will design guide RNAs that are specific to the target taxa, with at lea
    ```sh
    chmod u+x pathogd scripts/*
    mv pathogd scripts/* $CONDA_PREFIX/bin/
-   mv $CONDA_PREFIX/bin/
    ```
 
 6. You will also need Prokka and Roary installed on your system and in your `PATH`. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
@@ -406,4 +405,9 @@ However, they can still be useful for an assay not requiring a pre-amplification
 
 ## Citation
 
-The manuscript for PathoGD is currently under preparation. If you use this tool in your research, please cite https://github.com/sjlow23/pathogd.
+If you use this tool in your research, please cite:
+
+    "PathoGD: an integrative genomics approach for CRISPR-based target design of rapid pathogen diagnostics"
+    Soo Jen Low, Matthew O'Neill, William J. Kerry, Natasha Wild, Marcelina Krysiak, Yi Nong, Francesca Azzato, Eileen Hor, Lewis Williams, George Taiaroa, Eike Steinig, Shivani Pasricha, Deborah A. Williamson
+    bioRxiv 2024.05.14.593882; doi: https://doi.org/10.1101/2024.05.14.593882 
+[PathoGD: an integrative genomics approach for CRISPR-based target design of rapid pathogen diagnostics](https://www.biorxiv.org/content/10.1101/2024.05.14.593882v1.full)
