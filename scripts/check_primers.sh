@@ -192,7 +192,7 @@ run_ispcr() {
 		## Get prevalence statistics
 		## Group by primer set
 		for i in 0 1 2 3 4 5 6; do
-			csvtk filter -t -f "sum_primer_mismatches<="$i"" ispcr_target.tsv | 
+			csvtk filter -t -f "sum_primer_mismatches<="$i"" ispcr_"$1".tsv | 
 			csvtk summary -t -i -f "genome:countunique" -g primer_set |
 			csvtk mutate2 -n perc_mm"$i" -t -e '$genome:countunique/'"$genomecount"'*100' |
 			csvtk round -t -f perc_mm"$i" -n 1 |
