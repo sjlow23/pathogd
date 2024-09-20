@@ -25,3 +25,4 @@ dependencies:
   - pigz
   - r-stringr
   - taxonkit
+  - prokka
