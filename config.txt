@@ -41,7 +41,7 @@ domain|bacteria
 ## Assembly level of genomes to download 
 ## Choose from 'all', 'complete', 'chromosome', 'scaffold', 'contig')
 ## Can be multiple- separate levels by comma without space
-assembly_level|complete,chromosome
+assembly_level|all
 
 
 ## Size of gRNA (max 32)
@@ -70,13 +70,9 @@ ref_annot|no
 
 ## Perform target genome subsampling?
 ## Enter number of genomes to subsample if yes, or 'no' if no subsampling required
-subsample|20
-
-
-## Prokka conda environment
-prokka_env|prokka-1.14.6
+subsample|5
 
 
 ## Roary conda environment
-roary_env|roary-3.13.0
+roary_env|roary
 
