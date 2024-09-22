@@ -127,10 +127,10 @@ MAX_JOBS=$((CPU_CORES - 1))
 MAX_THREADS_PER_JOB=4
 MAX_PARALLEL_JOBS=$((MAX_JOBS/2))
 
-echo "Number of cores is $(nproc)"
-echo "Max jobs is "$MAX_JOBS""
-echo "Max threads per job is "$MAX_THREADS_PER_JOB""
-echo "Max parallel jobs is "$MAX_PARALLEL_JOBS""
+#echo "Number of cores is $(nproc)"
+#echo "Max jobs is "$MAX_JOBS""
+#echo "Max threads per job is "$MAX_THREADS_PER_JOB""
+#echo "Max parallel jobs is "$MAX_PARALLEL_JOBS""
 
 
 # Create output dir if it doesn't exist
@@ -164,7 +164,7 @@ logger "Using "$CPU_CORES" threads"
 # Activate conda environment
 conda_path=$(which conda | rev | cut -d'/' -f3- | rev)
 source "$conda_path"/etc/profile.d/conda.sh
-
+source "$conda_path"/etc/profile.d/mamba.sh
 
 # If nosubsample workflow selected, reset subsampled variable to no
 if [ $MODE == "ncbi_all_nosubsample" ] ||  [ $MODE == "user_all_nosubsample" ] || [ $MODE == "user_target_nosubsample" ]; then
@@ -191,32 +191,17 @@ fi
 
 # Define functions
 check_assemblies_taxid() {
-
 	# This module is only for selecting or subsampling genomes for input into one of the "user-provided genomes" module
 	# Make genomes_target and genomes_offtarget directories for downloading genomes
 	# Run wget script within those directories to download subsampled genomes
 
 	cd "$OUTPUT"
 	logger "Checking number of genome assemblies available for '$target_species'" 
+	MYORG="$domain"
 
 	if [ ! -f "genbank.txt" ] || [ ! -f "refseq.txt" ]; then  # condition to avoid redownload of summaries for testing - can be removed if behaviour not desired
-		if [[ "$domain" == "bacteria" ]]
-		then
-			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/bacteria/assembly_summary.txt --output-document=genbank.txt
-			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/assembly_summary.txt --output-document=refseq.txt
-		elif [[ "$domain" == "viral" ]]
-		then	
-			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/viral/assembly_summary.txt --output-document=genbank.txt
-			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/viral/assembly_summary.txt --output-document=refseq.txt
-		elif [[ "$domain" == "fungi" ]]
-		then 
-			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/fungi/assembly_summary.txt --output-document=genbank.txt
-			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/fungi/assembly_summary.txt --output-document=refseq.txt
-		elif [[ "$domain" == "protozoa" ]]
-		then
-			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/protozoa/assembly_summary.txt --output-document=genbank.txt
-			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/protozoa/assembly_summary.txt --output-document=refseq.txt
-		fi
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/$MYORG/assembly_summary.txt --output-document=genbank.txt
+			wget https://ftp.ncbi.nlm.nih.gov/genomes/refseq/$MYORG/assembly_summary.txt --output-document=refseq.txt
 	fi
 
 	if [[ -n "$target_taxid" ]]; then
@@ -238,117 +223,103 @@ check_assemblies_taxid() {
 		fi
 
 		# Target genomes
-		mkdir -p "$db"
-		cd "$db"
+		mkdir -p ${db}
+		cd ${db}
 
 		# If using taxids
 		if [[ -n "$target_taxid" ]]; then
-			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/target_sptaxids.txt "$OUTPUT"/"$db".txt > target_"$db".txt
+			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/target_sptaxids.txt "$OUTPUT"/${db}.txt > target_${db}.txt
 			
 		# If using species name
 		else
 			# if multiple species present
 			if [[ "$target_species" == *,* ]]; then
 				target_taxa=$(sed 's/,/|/g' <<< "$target_species")
-				egrep -w "$target_taxa" "$OUTPUT"/"$db".txt > target_"$db".txt
+				egrep -w "$target_taxa" "$OUTPUT"/${db}.txt > target_${db}.txt
 			else
-				grep -w "$target_species" "$OUTPUT"/"$db".txt > target_"$db".txt
+				grep -w "$target_species" "$OUTPUT"/${db}.txt > target_${db}.txt
 			fi
 		fi
 	
-		target_count=$(wc -l <target_"$db".txt)
+		target_count=$(wc -l <target_${db}.txt)
 		logger ""$target_count" "$mydb" assemblies found for target taxa"
 
 		# Subsample target genomes to maximum of 1000 per species (using species taxid column 7) if overrepresented
-		cut -f7 target_"$db".txt | sort | uniq -c | sed 's/^[ \t]*//' | sed 's/ /\t/1' | 
+		cut -f7 target_${db}.txt | sort | uniq -c | sed 's/^[ \t]*//' | sed 's/ /\t/1' | 
 		awk -F "\t" '{ if ($1<1000) print $2 > "keep.txt"; else print $2 > "sample.txt" }'
 
-		if [[ -s sample.txt && -s keep.txt ]]
-		then
+		if [[ -s sample.txt || -s keep.txt ]]; then
 			logger "Subsampling to a maximum of 1000 target genomes per target species"
-			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F "\t" -v id={} '\$7 == id {print}' target_"$db".txt | shuf -n 1000" | cut -f20 |
-			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' > wget_target_"$db".sh
-			
-			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt FS="\t" target_"$db".txt | cut -f20 |
-			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' >> wget_target_"$db".sh
-			
-			rm sample.txt keep.txt
 
-		elif [[ -s sample.txt && ! -s keep.txt ]]
-		then
-			logger "Subsampling to a maximum of 1000 target genomes per target species"
-			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F "\t" -v id={} '\$7 == id {print}' target_"$db".txt | shuf -n 1000" | cut -f20 |
-			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' > wget_target_"$db".sh
-			rm sample.txt
+			# Function to generate wget commands
+			generate_wget_commands() {
+				awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }'
+			}
 
-		elif [[ -s keep.txt && ! -s sample.txt ]]
-		then
-			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt FS="\t" target_"$db".txt | cut -f20 |
-			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_target" }' > wget_target_"$db".sh
-			rm keep.txt
+			if [[ -s sample.txt ]]; then
+				awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F '\t' -v id={} '\$7 == id {print}' target_${db}.txt | shuf -n 1000" | cut -f20 | generate_wget_commands > wget_target_${db}.sh
+			fi
+			if [[ -s keep.txt ]]; then
+				awk 'FNR==NR {arr[$1]=1; next} $7 in arr {print $0}' keep.txt FS="\t" target_${db}.txt | cut -f20 | generate_wget_commands >> wget_target_${db}.sh
+			fi
+
+			# Cleanup
+			[[ -s sample.txt ]] && rm sample.txt
+			[[ -s keep.txt ]] && rm keep.txt
 		fi
-
 
 		# Offtarget genomes
 		# If using taxids
 		if [[ -n "$offtarget_taxid" ]]; then
-			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/nontarget_sptaxids.txt "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
+			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/nontarget_sptaxids.txt "$OUTPUT"/${db}.txt > offtarget_${db}_tmp.txt
 			# rm "$OUTPUT"/nontarget_sptaxids.txt  # fix: this removes the file in the second iteration (refseq) and break the workflow
 		# if using species name
 		else
 			if [[ "$offtarget" == *,* ]]; then
 				#offtarget_taxa=$(echo "$offtarget_taxa" | sed 's/,/|/g')
 				offtarget_taxa=$(sed 's/,/|/g' <<< "$offtarget_species")
-				egrep -w "$offtarget_taxa" "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
+				egrep -w "$offtarget_taxa" "$OUTPUT"/${db}.txt > offtarget_${db}_tmp.txt
 			else
-				grep -w "$offtarget_species" "$OUTPUT"/"$db".txt > offtarget_"$db"_tmp.txt
+				grep -w "$offtarget_species" "$OUTPUT"/${db}.txt > offtarget_${db}_tmp.txt
 			fi
 		fi
 
 		# Remove overlapping genomes
-		grep -vwF -f target_"$db".txt offtarget_"$db"_tmp.txt > offtarget_"$db".txt
-		sed -i 's/\"//g' offtarget_"$db".txt
-		rm offtarget_"$db"_tmp.txt
+		grep -vwF -f target_${db}.txt offtarget_${db}_tmp.txt > offtarget_${db}.txt
+		sed -i 's/\"//g' offtarget_${db}.txt
+		rm offtarget_${db}_tmp.txt
 
-
-		offtarget_count=$(wc -l <"offtarget_$db.txt")
+		offtarget_count=$(wc -l <"offtarget_${db}.txt")
 		logger ""$offtarget_count" "$mydb" assemblies found for non-target taxa"
 
 		# Subsample offtarget genomes to maximum of 100 per species (using species_taxid column 7) if overrepresented
-		cut -f7 offtarget_"$db".txt | sort | uniq -c | sed 's/^[ \t]*//' | sed 's/ /\t/1' | 
+		cut -f7 offtarget_${db}.txt | sort | uniq -c | sed 's/^[ \t]*//' | sed 's/ /\t/1' | 
 		awk -F "\t" '{ if ($1<100) print $2 > "keep.txt"; else print $2 > "sample.txt" }'
 
-		if [[ -s sample.txt && -s keep.txt ]]
-		then
-			#awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' sample.txt offtarget_"$db".txt | shuf -n 100 > offtarget_"$db"_subsampled.txt
-			#awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt offtarget_"$db".txt >> offtarget_"$db"_subsampled.txt
+		if [[ -s sample.txt || -s keep.txt ]]; then
 			logger "Subsampling to a maximum of 100 genomes per non-target species"
-			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F "\t" -v id={} '\$7 == id {print}' offtarget_"$db".txt | shuf -n 100" | cut -f20 |
-			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' > wget_offtarget_"$db".sh
 
-			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt FS="\t" offtarget_"$db".txt | cut -f20 |
-			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' >> wget_offtarget_"$db".sh
-			rm sample.txt keep.txt
+			# Function to generate wget commands
+			generate_wget_commands() {
+				awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }'
+			}
 
-		elif [[ -s sample.txt && ! -s keep.txt ]]
-		then
-			logger "Subsampling to a maximum of 100 genomes per non-target species"
-			awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F "\t" -v id={} '\$7 == id {print}' offtarget_"$db".txt | shuf -n 100" | cut -f20 |
-			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' > wget_offtarget_"$db".sh
-			rm sample.txt
+			if [[ -s sample.txt ]]; then
+				awk '{print $1}' sample.txt | xargs -I {} sh -c "awk -F '\t' -v id={} '\$7 == id {print}' offtarget_${db}.txt | shuf -n 100" | cut -f20 | generate_wget_commands > wget_offtarget_${db}.sh
+			fi
+			if [[ -s keep.txt ]]; then
+				awk 'FNR==NR {arr[$1]=1; next} $7 in arr {print $0}' keep.txt FS="\t" offtarget_${db}.txt | cut -f20 | generate_wget_commands >> wget_offtarget_${db}.sh
+			fi
 
-		elif [[ -s keep.txt && ! -s sample.txt ]]
-		then
-			awk 'FNR==NR {arr[$1]=1 ; next} $7 in arr {print $0}' keep.txt FS="\t" offtarget_"$db".txt | cut -f20 |
-			awk -F "/" '{ print "wget "$0"/"$NF"_genomic.fna.gz -P genomes_offtarget" }' > wget_offtarget_"$db".sh
-			rm keep.txt
+			# Cleanup: remove input files only if wget script is generated
+			[[ -s sample.txt ]] && rm sample.txt
+			[[ -s keep.txt ]] && rm keep.txt
+			
 		fi
 		cd "$OUTPUT"
 
 	done
-	
-	rm genbank.txt refseq.txt
-
+		rm genbank.txt refseq.txt
 }
 
 
@@ -358,116 +329,72 @@ download_target_genomes() {
 	cd $OUTPUT
 	mkdir -p $GENOMES_TARGET $OUT_METADATA
 
-	if [[ $db == "genbank" ]] || [[ $db == "refseq" ]] 
-	then
-		if [[ -n "$target_taxid" ]]
-		then
-			taxonkit --data-dir $TAXONKIT_DB list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
+	if [[ $db == "genbank" ]] || [[ $db == "refseq" ]]; then
+		if [[ -n "$target_taxid" ]]; then
+			taxonkit --data-dir "$TAXONKIT_DB" list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
 
 			logger "Downloading target genomes using target species taxids"
-			ncbi-genome-download \
-			--section $db \
-			--species-taxids target_sptaxids.txt \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_TARGET \
-			--metadata-table $OUT_METADATA/metadata_target.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain ||
-			error_exit "No "$db" target genomes found!"
+			species_option="--species-taxids target_sptaxids.txt"
 		else
 			logger "Downloading target genomes using target species name"
-			ncbi-genome-download \
-			--section $db \
-			--genera "${target}" \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_TARGET \
-			--metadata-table $OUT_METADATA/metadata_target.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain ||
-			error_exit "No "$db" target genomes found!"
+			species_option="--genera \"$target\""
 		fi
 
-	elif [[ $db == "both" ]]
-	then
-		no_genomes=0
-		if [[ -n "$target_taxid" ]]
-		then
-			taxonkit --data-dir $TAXONKIT_DB list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
-			
-			logger "Downloading target genomes from NCBI RefSeq using target species taxids"
-			ncbi-genome-download \
-			--section refseq \
-			--species-taxids target_sptaxids.txt \
+		# Common ncbi-genome-download command
+		ncbi-genome-download \
+			--section "$db" \
+			$species_option \
 			--flat-output \
 			--formats fasta \
-			--output-folder $GENOMES_TARGET \
-			--metadata-table $OUT_METADATA/metadata_target_refseq.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
+			--output-folder "$GENOMES_TARGET" \
+			--metadata-table "$OUT_METADATA/metadata_target.tsv" \
+			--assembly-levels "$assembly_level" \
+			--parallel "$MAX_JOBS" \
 			--retries 5 \
-			$domain || ((no_genomes++))
+			$domain ||
+			error_exit "No $db target genomes found!"	
 
-			logger "Downloading target genomes from NCBI GenBank using target species taxids"
+	elif [[ $db == "both" ]]; then
+		no_genomes=0
+
+		download_genomes() {
+			local section=$1
+			local species_option=$2
+			local metadata_file=$3
+
+			logger "Downloading target genomes from NCBI $section using $species_option"
 			ncbi-genome-download \
-			--section genbank \
-			--species-taxids target_sptaxids.txt \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_TARGET \
-			--metadata-table $OUT_METADATA/metadata_target_genbank.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain || ((no_genomes++))
+				--section "$section" \
+				$species_option \
+				--flat-output \
+				--formats fasta \
+				--output-folder "$GENOMES_TARGET" \
+				--metadata-table "$metadata_file" \
+				--assembly-levels "$assembly_level" \
+				--parallel "$MAX_JOBS" \
+				--retries 5 \
+				$domain || ((no_genomes++))
+		}
+
+		if [[ -n "$target_taxid" ]]; then
+			taxonkit --data-dir "$TAXONKIT_DB" list --ids "$target_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > target_sptaxids.txt
+			
+			download_genomes "refseq" "--species-taxids target_sptaxids.txt" "$OUT_METADATA/metadata_target_refseq.tsv"
+			download_genomes "genbank" "--species-taxids target_sptaxids.txt" "$OUT_METADATA/metadata_target_genbank.tsv"
 
 			if [[ $no_genomes -eq 2 ]]; then
 				error_exit "No target genomes found using species taxids!"
 			fi
-
-			# species taxid absent, use species name
 		else
-			logger "Downloading target genomes from NCBI RefSeq using target species name"
-			ncbi-genome-download \
-			--section refseq \
-			--genera "${target}" \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_TARGET \
-			--metadata-table $OUT_METADATA/metadata_target_refseq.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain || ((no_genomes++))
-
-			logger "Downloading target genomes from NCBI GenBank using target species name"
-			ncbi-genome-download \
-			--section genbank \
-			--genera "${target}" \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_TARGET \
-			--metadata-table $OUT_METADATA/metadata_target_genbank.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain || ((no_genomes++))
+			download_genomes "refseq" "--genera \"$target\"" "$OUT_METADATA/metadata_target_refseq.tsv"
+			download_genomes "genbank" "--genera \"$target\"" "$OUT_METADATA/metadata_target_genbank.tsv"
 
 			if [[ $no_genomes -eq 2 ]]; then
 				error_exit "No target genomes found using species names!"
 			fi
-
 		fi
 	fi
-
-
 }
-
 
 
 download_nontarget_genomes() {
@@ -475,117 +402,72 @@ download_nontarget_genomes() {
 	cd $OUTPUT
 	mkdir -p $GENOMES_OFFTARGET $OUT_METADATA
 
-	if [[ $db == "genbank" ]] || [[ $db == "refseq" ]] 
-	then
-		if [[ -n "$offtarget_taxid" ]]
-		then
-			taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
+	if [[ $db == "genbank" ]] || [[ $db == "refseq" ]]; then
+		if [[ -n "$offtarget_taxid" ]]; then
+			taxonkit --data-dir "$TAXONKIT_DB" list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 
 			logger "Downloading non-target genomes using non-target species taxids"
-			ncbi-genome-download \
-			--section $db \
-			--species-taxids nontarget_sptaxids.txt \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_OFFTARGET \
-			--metadata-table $OUT_METADATA/metadata_offtarget.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain ||
-			error_exit "No non-target genomes found!"
+			species_option="--species-taxids nontarget_sptaxids.txt"
 		else
 			logger "Downloading non-target genomes using non-target species name"
-			ncbi-genome-download \
-			--section $db \
-			--genera "${offtarget}" \
+			species_option="--genera \"$offtarget\""
+		fi
+
+	# Common ncbi-genome-download command
+		ncbi-genome-download \
+			--section "$db" \
+			$species_option \
 			--flat-output \
 			--formats fasta \
-			--output-folder $GENOMES_OFFTARGET \
-			--metadata-table $OUT_METADATA/metadata_offtarget.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
+			--output-folder "$GENOMES_OFFTARGET" \
+			--metadata-table "$OUT_METADATA/metadata_offtarget.tsv" \
+			--assembly-levels "$assembly_level" \
+			--parallel "$MAX_JOBS" \
 			--retries 5 \
 			$domain ||
-			error_exit "No nontarget genomes found!"
-		fi
+			error_exit "No $db non-target genomes found!"	
+	
+	elif [[ $db == "both" ]]; then
+		no_genomes=0
 
+		download_genomes() {
+			local section=$1
+			local species_option=$2
+			local metadata_file=$3
 
-	elif [[ $db == "both" ]]
-	then
-		if [[ -n "$offtarget_taxid" ]]
-		then
-			taxonkit --data-dir $TAXONKIT_DB list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
-			no_genomes=0
+			logger "Downloading non-target genomes from NCBI $section using $species_option"
+			ncbi-genome-download \
+				--section "$section" \
+				$species_option \
+				--flat-output \
+				--formats fasta \
+				--output-folder "$GENOMES_OFFTARGET" \
+				--metadata-table "$metadata_file" \
+				--assembly-levels "$assembly_level" \
+				--parallel "$MAX_JOBS" \
+				--retries 5 \
+				$domain || ((no_genomes++))
+		}
+
+		if [[ -n "$offtarget_taxid" ]]; then
+			taxonkit --data-dir "$TAXONKIT_DB" list --ids "$offtarget_taxid" -r | grep "\[species\]" | awk '{ print $1 }' > nontarget_sptaxids.txt
 			
-			logger "Downloading non-target genomes from NCBI RefSeq using non-target species taxids"
-			ncbi-genome-download \
-			--section refseq \
-			--species-taxids nontarget_sptaxids.txt \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_OFFTARGET \
-			--metadata-table $OUT_METADATA/metadata_offtarget_refseq.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain || ((no_genomes++))
-
-			logger "Downloading non-target genomes from NCBI GenBank using non-target species taxids"
-			ncbi-genome-download \
-			--section genbank \
-			--genera "${offtarget}" \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_OFFTARGET \
-			--metadata-table $OUT_METADATA/metadata_offtarget_genbank.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain || ((no_genomes++))
+			download_genomes "refseq" "--species-taxids nontarget_sptaxids.txt" "$OUT_METADATA/metadata_offtarget_refseq.tsv"
+			download_genomes "genbank" "--species-taxids nontarget_sptaxids.txt" "$OUT_METADATA/metadata_offtarget_genbank.tsv"
 
 			if [[ $no_genomes -eq 2 ]]; then
 				error_exit "No non-target genomes found using species taxids!"
 			fi
-
-		# species taxid absent, use species name	
-		else 
-			logger "Downloading non-target genomes from NCBI RefSeq using non-target species name"
-			ncbi-genome-download \
-			--section refseq \
-			--genera "${offtarget}" \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_OFFTARGET \
-			--metadata-table $OUT_METADATA/metadata_offtarget_refseq.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain || ((no_genomes++))
-
-			logger "Downloading non-target genomes from NCBI GenBank using non-target species name"
-			ncbi-genome-download \
-			--section genbank \
-			--genera "${offtarget}" \
-			--flat-output \
-			--formats fasta \
-			--output-folder $GENOMES_OFFTARGET \
-			--metadata-table $OUT_METADATA/metadata_offtarget_genbank.tsv \
-			--assembly-levels "${assembly_level}" \
-			--parallel $MAX_JOBS \
-			--retries 5 \
-			$domain || ((no_genomes++))
+		else
+			download_genomes "refseq" "--genera \"$target\"" "$OUT_METADATA/metadata_offtarget_refseq.tsv"
+			download_genomes "genbank" "--genera \"$target\"" "$OUT_METADATA/metadata_offtarget_genbank.tsv"
 
 			if [[ $no_genomes -eq 2 ]]; then
-				error_exit "No non-target genomes found using species taxids!"
+				error_exit "No non-target genomes found using species names!"
 			fi
-
 		fi
-
 	fi
-
 }
-
 
 
 remove_overlap_genomes() {
@@ -613,48 +495,41 @@ remove_overlap_genomes() {
 
 
 decompress_genomes() {
-	if [[ $1 == "target" ]]
-	then
-		cd $GENOMES_TARGET 
+	process_genomes() {
+		local genome_type=$1
+		local genomes_dir=$2
+		local output_file=$3
+		local log_msg=$4
 
-		logger "Decompressing target genomes"
-		local count_target=$(find . \( -type f -o -type l \) -name "*.gz" -or -name "*.fna" | wc -l)
-		
-		[[ "$count_target" -ge 2 ]] || error_exit "Only 1 target genome found - cannot proceed!"
+		cd "$genomes_dir" || error_exit "Failed to change directory to $genomes_dir"
 
-		find . -type f -name "*.gz" | parallel -j "$MAX_JOBS" gunzip
+		logger "$log_msg"
+		local count=$(find . \( -type f -o -type l \) -name "*.gz" -or -name "*.fna" | wc -l)
 
-		## Arrays for renaming files
-		local ori=($(ls -d *.fna))
-		
-		## Handle NCBI assembly format names differently
-		local new=($(printf '%s\n' "${ori[@]}" | awk -F "_" '{ if ($0 ~ /^GC/) print $1"_"$2"_genomic.fna"; else print $0 }'))
-		for i in "${!ori[@]}"; do if [[ "${ori[i]}" != "${new[i]}" ]]; then mv -n "${ori[i]}" "${new[i]}"; fi; done
-
-		find . -maxdepth 1 \( -type f -o -type l \) -name "*.fna" -exec basename {} _genomic.fna \; > $OUTPUT/genomes_target.txt
-		cd $OUTPUT
-
-	elif [[ $1 == "offtarget" ]]
-	then
-		cd $GENOMES_OFFTARGET
-
-		logger "Decompressing non-target genomes"
-		local count_offtarget=$(find . \( -type f -o -type l \) -name "*.gz" -or -name "*.fna" | wc -l)
-
-		[[ "$count_offtarget" -ge 2 ]] || error_exit "Only 1 non-target genome found - cannot proceed!"
+		[[ "$count" -ge 2 ]] || error_exit "Only 1 $genome_type genome found - cannot proceed!"
 
 		find . -type f -name "*.gz" | parallel -j "$MAX_JOBS" gunzip
 
 		local ori=($(ls -d *.fna))
 		local new=($(printf '%s\n' "${ori[@]}" | awk -F "_" '{ if ($0 ~ /^GC/) print $1"_"$2"_genomic.fna"; else print $0 }'))
-		#local new=($(ls -d *.fna | awk -F "_" '{ print $1"_"$2"_genomic.fna" }'))
-		for i in "${!ori[@]}"; do if [[ "${ori[i]}" != "${new[i]}" ]]; then mv -n "${ori[i]}" "${new[i]}"; fi; done
 
-		find . -maxdepth 1 \( -type f -o -type l \) -name "*.fna" -exec basename {} _genomic.fna \; > $OUTPUT/genomes_offtarget.txt
-		cd $OUTPUT
+		for i in "${!ori[@]}"; do
+			if [[ "${ori[i]}" != "${new[i]}" ]]; then
+				mv -n "${ori[i]}" "${new[i]}"
+			fi
+		done
+
+		find . -maxdepth 1 \( -type f -o -type l \) -name "*.fna" -exec basename {} _genomic.fna \; > "$output_file"
+		cd "$OUTPUT" || error_exit "Failed to change directory to $OUTPUT"
+	}
+
+	if [[ $1 == "target" ]]; then
+		process_genomes "target" "$GENOMES_TARGET" "$OUTPUT/genomes_target.txt" "Decompressing target genomes"
+
+	elif [[ $1 == "offtarget" ]]; then
+		process_genomes "non-target" "$GENOMES_OFFTARGET" "$OUTPUT/genomes_offtarget.txt" "Decompressing non-target genomes"
 	fi
 }
-
 
 
 prepare_human_genome() {
@@ -673,29 +548,32 @@ prepare_human_genome() {
 	## Check if kmer list present	
 	cd $DATABASE
 	
-	if [[ -s GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list && -s GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list ]]
+	local basefile="GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list"
+	local extfile="GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list"
+	local ref="GCF_000001405.40_GRCh38.p14_genomic.fna"
+	local prefix=$(echo "${ref%.*}")
+
+	if [[ -s $basefile && -s $extfile ]]
 	then
 		logger "k-mer lists for human genome for selected 'k' previously generated"
-	elif [[ ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list && ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list ]]
+	elif [[ ! -s $basefile && ! -s $extfile ]]
 	then
 		logger "Counting k="$kmer" and k="$kmerpam" in human genome"
-		glistmaker GCF_000001405.40_GRCh38.p14_genomic.fna --num_threads "$MAX_JOBS" -w "$kmer" -o GCF_000001405.40_GRCh38.p14_genomic
-		glistmaker GCF_000001405.40_GRCh38.p14_genomic.fna --num_threads "$MAX_JOBS" -w "$kmerpam" -o GCF_000001405.40_GRCh38.p14_genomic
+		glistmaker $ref --num_threads "$MAX_JOBS" -w "$kmer" -o $prefix
+		glistmaker $ref --num_threads "$MAX_JOBS" -w "$kmerpam" -o $prefix
 
-	elif [[ -s GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list && ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list ]]
+	elif [[ -s $basefile && ! -s $extfile ]]
 	then
 		logger "Counting k="$kmerpam" in human genome"
-		glistmaker GCF_000001405.40_GRCh38.p14_genomic.fna --num_threads "$MAX_JOBS" -w "$kmerpam" -o GCF_000001405.40_GRCh38.p14_genomic
-	elif [[ -s GCF_000001405.40_GRCh38.p14_genomic_"$kmerpam".list && ! -s GCF_000001405.40_GRCh38.p14_genomic_"$kmer".list ]]
+		glistmaker $ref --num_threads "$MAX_JOBS" -w "$kmerpam" -o $prefix
+	elif [[ -s $extfile && ! -s $basefile ]]
 	then
 		logger "Counting k="$kmer" in human genome"
-		glistmaker GCF_000001405.40_GRCh38.p14_genomic.fna --num_threads "$MAX_JOBS" -w "$kmer" -o GCF_000001405.40_GRCh38.p14_genomic
+		glistmaker $ref --num_threads "$MAX_JOBS" -w "$kmer" -o $prefix
 	fi
 
 	cd $OUTPUT
-
 }
-
 
 
 subsample_genomes() {
@@ -704,7 +582,6 @@ subsample_genomes() {
 	local oricount=$(wc -l <$OUTPUT/genomes_target.txt)
 
 	[[ -s "$OUTPUT"/genomes_target.txt ]] || { error_exit "No target genomes found"; return; }
-	
 	[[ -s "$OUTPUT"/genomes_target_subsample.txt ]] && return
 
 	if [[ "$oricount" -gt "$subsample" ]]
@@ -717,7 +594,6 @@ subsample_genomes() {
 		cp "$OUTPUT"/genomes_target.txt "$OUTPUT"/genomes_target_subsample.txt
 	fi
 }
-
 
 
 get_pangenome() {
@@ -740,7 +616,7 @@ get_pangenome() {
 	set +u
 	if [[ -n "${prokka_env:-}" ]] 
 	then
-		conda activate $prokka_env
+		mamba activate $prokka_env
 	fi
 
 	if [[ "$ref_annot" == "yes" ]]
@@ -761,7 +637,6 @@ get_pangenome() {
 			rm prokka/"{}"_out/proteins.*'
 		fi
 
-
 	elif [[ "$ref_annot" == "no" ]]
 	then
 		if [[ "$(ls -A prokka)" ]]
@@ -775,14 +650,13 @@ get_pangenome() {
 		fi
 	fi
 
-
-	conda deactivate
+	mamba deactivate
 
 	logger "Estimating pangenome for '$target_species'"
 
 	if [[ -n "${roary_env:-}" ]]
 	then
-		conda activate $roary_env
+		mamba activate $roary_env
 	fi
 
 	if [[ -s roary/gene_presence_absence.csv ]]
@@ -792,7 +666,7 @@ get_pangenome() {
 		roary -cd 90 -s -z --mafft -p "$MAX_JOBS" -f roary prokka/*_out/*.gff
 	fi
 	
-	conda deactivate
+	mamba deactivate
 	set +u
 
 	## Get list of conserved genes (at least 90% prevalence)]
@@ -815,7 +689,6 @@ get_pangenome() {
 	cd $OUTPUT
 
 }
-
 
 
 species_specific_genes() {
@@ -927,7 +800,6 @@ species_specific_genes() {
 }
 
 
-
 align_species_specific() {
 	## Align only species-specific genes
 	cd $PANGENOME
@@ -964,7 +836,6 @@ align_species_specific() {
 	cd $OUTPUT
 
 }
-
 
 
 get_guides_pam() {
