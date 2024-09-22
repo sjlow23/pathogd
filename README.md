@@ -26,38 +26,38 @@ PathoGD will design guide RNAs that are specific to the target taxa, with at lea
    ```
 
 2. Create a new empty conda environment
-   
-      _Use default conda environment path:_
    ```sh
-   conda create -n pathogdenv
-   ```
-
-   _Create in user-specified directory:_
-   ```sh
-   conda create --prefix /dir/to/pathogdenv
+   mamba create -n pathogdenv
+   mamba create --prefix /dir/to/pathogdenv
    ```
    
 3. Activate the conda environment
    ```sh
-   conda activate pathogdenv
-   conda activate /dir/to/pathogdenv
+   mamba activate pathogdenv
+   mamba activate /dir/to/pathogdenv
    ```
 
 4. Install required packages using the `pathogd.yaml` file provided.
 
    ```sh
-   conda env update --name pathogdenv --file pathogd.yaml 
-   conda env update --prefix /dir/to/pathogdenv --file pathogd.yaml
+   mamba env update --name pathogdenv --file pathogd.yaml 
+   mamba env update --prefix /dir/to/pathogdenv --file pathogd.yaml
    ```
 
-5. Make scripts executable and move into bin directory of conda environment
+5. Run install.sh script
    ```sh
-   chmod u+x pathogd scripts/*
-   mv pathogd scripts/* $CONDA_PREFIX/bin/
+   sh scripts/install.sh
    ```
 
-6. You will also need Prokka and Roary installed on your system and in your `PATH`. See [Prokka](https://github.com/tseemann/prokka "Prokka") and [Roary](https://github.com/sanger-pathogens/Roary "Roary") for installation instructions.
+6. You will also need Roary installed on your system and in your `PATH`, or if installed in a conda enviornment, specify the environment name in the config file. 
+   Roary is only needed if using the `pangenome` module (see below). See [Roary](https://github.com/sanger-pathogens/Roary "Roary") for more details.
 
+   ```sh
+   mamba create -n roary
+   mamba activate roary
+   mamba install -c bioconda roary
+   mamba deactivate
+   ```
 
 <p align="right">(<a href="#installation-top">back to top</a>)</p>
 
