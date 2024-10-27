@@ -10,9 +10,9 @@ usage() {
 	echo -e "\nUsage:"
 	echo -e "  $0 [-c <config file>] [-p <cas (optional)>] [-a <amplification method (optional)] [-m <method (optional)>] [-w <workflow>] [-o <output directory>] [-r <reference genbank file (optional)>] [-t <number of cpus (default 8)>]\n"
 	echo "Required:"
-	echo	"	-c	Config file specifying run parameters"
-	echo 	"	-p  Cas nuclease to design gRNAs for (cas12 or cas13)"
-	echo    "   -a  Amplification method (rpa or pcr)"
+	echo -e	"	-c	Config file specifying run parameters"
+	echo -e	"	-p	Cas nuclease to design gRNAs for (cas12 or cas13)"
+	echo -e	"	-a	Amplification method (rpa or pcr)"
 	echo -e "	-m	Guide/primer design method - one of the following:\n"
 	echo -e	"		  pangenome\t\tdesign guides from protein-coding regions"
 	echo -e	"		  kmer\t\t\tdesign guides using gene-agnostic approach\n"
@@ -30,8 +30,8 @@ usage() {
 	echo -e	"		  user_all_nosubsample\t\tuser-provided target and non-target genomes; no subsampling\n"
 	echo -e	"	-o	Output directory\n"
 	echo "Optional:"
-	echo -e   "	-r	Reference genome GenBank file for training and annotation (pangenome method only)\n"
-	echo -e	  "	-t 	Number of cpus\n"
+	echo -e   "	-r	Reference genome GenBank file for training and annotation (pangenome method only)"
+	echo -e	  "	-t 	Number of cpus"
 	echo -e "	-h      Print this help menu\n"
 	exit 0
 }
