@@ -25,7 +25,7 @@ usage() {
 	echo -e	"		  ncbi_all_subsample\t\tdownload target and non-target genomes from NCBI; run subsampling"
 	echo -e	"		  ncbi_all_nosubsample\t\tdownload target and non-target genomes from NCBI; no subsampling"
 	echo -e	"		  user_target_subsample\t\tuser-provided target genomes; download non-target genomes from NCBI; run subsampling"
-	echo -e	"		  user_target_nosubsample\t\tuser-provided target genomes, download non-target genomes from NCBI; no subsampling"
+	echo -e	"		  user_target_nosubsample\tuser-provided target genomes, download non-target genomes from NCBI; no subsampling"
 	echo -e	"		  user_all_subsample\t\tuser-provided target and non-target genomes; run subsampling"
 	echo -e	"		  user_all_nosubsample\t\tuser-provided target and non-target genomes; no subsampling\n"
 	echo -e	"	-o	Output directory\n"
