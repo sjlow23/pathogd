@@ -2,7 +2,7 @@
 <a name="readme-top"></a>
 ## About PathoGD
 
-PathoGD is a bioinformatic pipeline for the rapid and high-throughput design of RPA primers and guide RNAs (gRNA) for CRISPR-Cas12a-based nucleic acid detection. It incorporates two complementary modules- pangenome and *k*-mer- targeting the protein-coding and whole genome, respectively, for selection of a target region and subsequent guide RNA and primer design. PathoGD was initially developed for and tested on bacterial genomes, but should work on any organism whose genome sequences are available.
+PathoGD is a bioinformatic pipeline for the rapid and high-throughput design of RPA primers and guide RNAs (gRNA) for CRISPR-Cas12a-based nucleic acid detection. It incorporates two complementary modules- pangenome and *k*-mer- targeting the protein-coding and whole genome, respectively, for selection of a target region and subsequent guide RNA and primer design. PathoGD was initially developed for and tested on bacterial genomes, but should work on any organism whose genome sequences are available. The default behavior is to design RPA primers for Cas12a-based detection, with the requirement of a TTTN PAM site directly upstream of the guide RNA sequence. However, there is also the option of PAM-less guide RNA design and primer design for PCR, rather than isothermal amplification.
 
 
 ## Introduction
@@ -19,29 +19,22 @@ PathoGD will design guide RNAs that are specific to the target taxa, with at lea
 <a name="installation-top"></a>
 ## Installation
 
-1. Clone the repo into your working directory
+1. Make sure you have [Mamba](https://github.com/conda-forge/miniforge) installed
+
+2. Clone the repo into your working directory
    ```sh
    git clone https://github.com/sjlow23/pathogd.git
    cd pathogd
    ```
 
-2. Create a new empty conda environment
+3. Create pathogd conda environment
    ```sh
-   mamba create -n pathogdenv
-   mamba create --prefix /dir/to/pathogdenv
+   mamba env create -n pathogdenv --file pathogd.yaml
    ```
    
-3. Activate the conda environment
+4. Activate the conda environment
    ```sh
    mamba activate pathogdenv
-   mamba activate /dir/to/pathogdenv
-   ```
-
-4. Install required packages using the `pathogd.yaml` file provided.
-
-   ```sh
-   mamba env update --name pathogdenv --file pathogd.yaml 
-   mamba env update --prefix /dir/to/pathogdenv --file pathogd.yaml
    ```
 
 5. Run install.sh script
@@ -49,7 +42,7 @@ PathoGD will design guide RNAs that are specific to the target taxa, with at lea
    sh scripts/install.sh
    ```
 
-6. You will also need Roary installed on your system and in your `PATH`, or if installed in a conda enviornment, specify the environment name in the config file. 
+6. You will also need Roary installed on your system and in your `PATH`, or if installed in a conda   environment, specify the environment name in the config file. 
    Roary is only needed if using the `pangenome` module (see below). See [Roary](https://github.com/sanger-pathogens/Roary "Roary") for more details.
 
    ```sh
@@ -308,6 +301,25 @@ The output file is `uniq_target_kmers_final_prevalence.tsv` under the `kmers_res
 | perc_total              | Percentage of genomes with gRNA sequence                        |
 
 
+## E. Design guide RNAs for PAM-less Cas, eg. Cas13a applications
+
+Although designed primarily for Cas12a applications, the guide RNAs designed can potentially be used for Cas13a-based diagnostics, if there is no PAM requirement for the gRNA to bind its target.
+To design guide RNAs without the TTTN PAM restriction, add the **`-p`** flag:
+
+   ```sh
+   pathogd -c config.txt -m pangenome -p cas13 -w user_target_nosubsample -o pathogd_output
+   ```
+
+
+## F. Design primers for PCR applications
+
+By default, PathoGD designs primers using parameters suited for RPA applications. 
+To design primers for use with regular PCR, add the **`-a`** flag:
+
+   ```sh
+   pathogd -c config.txt -m pangenome -p cas13 -a pcr -w user_target_nosubsample -o pathogd_output
+   ```
+   
 
 
 ## Output
