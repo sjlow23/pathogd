@@ -17,7 +17,8 @@ library(stringr)
 #$8: guide sensitivity output file
 #$9: guide specificity output file
 #$10: gene annotation file (for pangenome)
-#$11: workflow (kmer or pangenome)
+#$11: cas13 compatibility file
+#$12: workflow (kmer or pangenome)
 
 args <- commandArgs(trailingOnly=TRUE)
 
@@ -70,9 +71,14 @@ if (file.exists(args[10])) {
 		annot <- NULL
 	}
 
+if (file.exists(args[11])) {
+	cas13 <- fread(args[11], header=T, sep="\t")
+	} else {
+		cas13 <- NULL
+	}
 
 ## Handle differently for pangenome and kmer
-if (args[11] == "kmer") {
+if (args[12] == "kmer") {
 	primer_output <- primer_output %>%
 	mutate(primerset_new = paste("primer", primer_set, pam, guide_set, sep="|"))
 	
@@ -83,17 +89,11 @@ if (args[11] == "kmer") {
 		left_join(guide_specificity, by="guide") %>%
 		mutate(guide_offtarget_prevalence_max5mm=unique_genome/nontargetcount*100) %>%
 		select(-unique_genome)
-		# mutate(guide_ncpam_offtarget_prevalence_max5mm=ifelse("unique_genome_ncpam" %in% colnames(.),
-		# 	unique_genome_ncpam/nontargetcount*100, NA)) %>%
-		# select(if (exists('unique_genome_ncpam')) -unique_genome_ncpam else everything())
-		} else {
-			guide_output <- guide_output %>%
-			mutate(guide_target_prevalence=unique_genome/targetcount*100) %>% 
-			select(-unique_genome)
-			# mutate(guide_ncpam_offtarget_prevalence_max5mm=ifelse("unique_genome_ncpam" %in% colnames(.), 
-			# 	unique_genome_ncpam/nontargetcount*100, NA)) %>%
-			# select(if (exists('unique_genome_ncpam')) -unique_genome_ncpam else everything())
-		}
+	} else {
+		guide_output <- guide_output %>%
+		mutate(guide_target_prevalence=unique_genome/targetcount*100) %>% 
+		select(-unique_genome)
+	}
 
 } else {   #pangenome
 	primer_output <- primer_output %>%
@@ -108,18 +108,12 @@ if (args[11] == "kmer") {
 		left_join(guide_specificity, by="guide") %>%
 		mutate(guide_offtarget_prevalence_max5mm=unique_genome/nontargetcount*100) %>%
 		select(-unique_genome)
-		# mutate(guide_ncpam_offtarget_prevalence_max5mm=ifelse("unique_genome_ncpam" %in% colnames(.), 
-		# 	unique_genome_ncpam/nontargetcount*100, NA)) %>%
-		# select(if (exists('unique_genome_ncpam')) -unique_genome_ncpam else everything())
-		} else {
-			guide_output <- guide_output %>%
-			mutate(guide_target_prevalence=unique_genome/targetcount*100) %>%
-			select(-unique_genome)
-			# mutate(guide_ncpam_offtarget_prevalence_max5mm=ifelse("unique_genome_ncpam" %in% colnames(.),
-			# 	unique_genome_ncpam/nontargetcount*100, NA)) %>%
-			# select(if (exists('unique_genome_ncpam')) -unique_genome_ncpam else everything())
-		}
+	} else {
+		guide_output <- guide_output %>%
+		mutate(guide_target_prevalence=unique_genome/targetcount*100) %>%
+		select(-unique_genome)
 	}
+}
 
 
 ## Link dereplicated primers to ori
@@ -166,9 +160,9 @@ if (!is.null(nontargets)) {
 		avg_amplicon_num_nontarget = n()/n_distinct(genome),
 		avg_amplicon_length_nontarget = mean(amplicon_length)) %>%
 	select(-ends_with("count"))
-	} else {
-		nontargets_summary <- NULL
-	}
+} else {
+	nontargets_summary <- NULL
+}
 
 
 ## Merge target and nontarget output, annotation information, cas13a compatibility
@@ -177,52 +171,52 @@ if (!is.null(nontargets_summary)) {
 	combined <- targets_summary %>%
 	left_join(nontargets_summary, by="primer_set")
 
-	if (args[11] == "kmer") {
+	if (args[12] == "kmer") {
 		final <- new_lookup %>%
 		left_join(combined, by=c("primerset_uniq"="primer_set")) %>%
 		left_join(guide_output, by=c("guide_set"="guide")) %>%
-		#left_join(cas13, by=c("guide_set"="guide", "primerset_uniq"="primerset")) %>%
+		left_join(cas13, by=c("guide_set"="guide", "primerset_uniq"="primerset")) %>%
 		filter(primer_target_prevalence_0mm!=0 | primer_target_prevalence_0mm!="") %>%
-		mutate(primer_cas13a_compatibility="swap_primers") %>%
+		#mutate(primer_cas13a_compatibility="swap_primers") %>%
 		relocate(primer_cas13a_compatibility, .after=rev_primer)
-		} else {
-			final <- new_lookup %>%
-			left_join(combined, by=c("primerset_uniq"="primer_set")) %>%
-			left_join(guide_output, by=c("guide_set"="guide")) %>%
-			left_join(annot, by=c("gene"="Gene")) %>%
-			rename(gene_annotation=Annotation) %>%
-			relocate(gene_annotation, .after=gene) %>%
-			select(-probe) %>%
-			mutate(primer_cas13a_compatibility=case_when(endsWith(guide_set, "f") ~ "swap primers", TRUE ~ "yes")) %>%
-			filter(primer_target_prevalence_0mm!=0 | primer_target_prevalence_0mm!="") %>%
-			relocate(primer_cas13a_compatibility, .after=rev_primer)	
-		}
+	} else {
+		final <- new_lookup %>%
+		left_join(combined, by=c("primerset_uniq"="primer_set")) %>%
+		left_join(guide_output, by=c("guide_set"="guide")) %>%
+		left_join(annot, by=c("gene"="Gene")) %>%
+		rename(gene_annotation=Annotation) %>%
+		relocate(gene_annotation, .after=gene) %>%
+		select(-probe) %>%
+		mutate(primer_cas13a_compatibility=case_when(endsWith(guide_set, "f") ~ "swap primers", TRUE ~ "yes")) %>%
+		filter(primer_target_prevalence_0mm!=0 | primer_target_prevalence_0mm!="") %>%
+		relocate(primer_cas13a_compatibility, .after=rev_primer)	
+	}
 
-		fwrite(final, args[7], col.names=T, row.names=F, sep="\t", quote=F)
+	fwrite(final, args[7], col.names=T, row.names=F, sep="\t", quote=F)
 
-		} else {
-			if (args[11] == "kmer") {
-				final <- new_lookup %>%
-				left_join(targets_summary, by=c("primerset_uniq"="primer_set")) %>%
-				left_join(guide_output, by=c("guide_set"="guide")) %>%
-				#left_join(cas13, by=c("guide_set"="guide", "primerset_uniq"="primerset")) %>%
-				filter(primer_target_prevalence_0mm!=0 | primer_target_prevalence_0mm!="") %>%
-				mutate(primer_cas13a_compatibility="swap_primers") %>%
-				relocate(primer_cas13a_compatibility, .after=rev_primer)
-				} else {
-					final <- new_lookup %>%
-					left_join(targets_summary, by=c("primerset_uniq"="primer_set")) %>%
-					left_join(guide_output, by=c("guide_set"="guide")) %>%
-					left_join(annot, by=c("gene"="Gene")) %>%
-					rename(gene_annotation=Annotation) %>%
-					relocate(gene_annotation, .after=gene) %>%
-					select(-probe) %>% 
-					mutate(primer_cas13a_compatibility=case_when(endsWith(guide_set, "f") ~ "swap primers", TRUE ~ "yes")) %>%
-					filter(primer_target_prevalence_0mm!=0 | primer_target_prevalence_0mm!="") %>%
-					relocate(primer_cas13a_compatibility, .after=rev_primer)
-				}
-				
-				fwrite(final, args[7], col.names=T, row.names=F, sep="\t", quote=F)
-			}
+} else {
+	if (args[12] == "kmer") {
+		final <- new_lookup %>%
+		left_join(targets_summary, by=c("primerset_uniq"="primer_set")) %>%
+		left_join(guide_output, by=c("guide_set"="guide")) %>%
+		left_join(cas13, by=c("guide_set"="guide", "primerset_uniq"="primerset")) %>%
+		filter(primer_target_prevalence_0mm!=0 | primer_target_prevalence_0mm!="") %>%
+		#mutate(primer_cas13a_compatibility="swap_primers") %>%
+		relocate(primer_cas13a_compatibility, .after=rev_primer)
+	} else {
+		final <- new_lookup %>%
+		left_join(targets_summary, by=c("primerset_uniq"="primer_set")) %>%
+		left_join(guide_output, by=c("guide_set"="guide")) %>%
+		left_join(annot, by=c("gene"="Gene")) %>%
+		rename(gene_annotation=Annotation) %>%
+		relocate(gene_annotation, .after=gene) %>%
+		select(-probe) %>% 
+		mutate(primer_cas13a_compatibility=case_when(endsWith(guide_set, "f") ~ "swap primers", TRUE ~ "yes")) %>%
+		filter(primer_target_prevalence_0mm!=0 | primer_target_prevalence_0mm!="") %>%
+		relocate(primer_cas13a_compatibility, .after=rev_primer)
+	}
+		
+	fwrite(final, args[7], col.names=T, row.names=F, sep="\t", quote=F)
+}
 
 

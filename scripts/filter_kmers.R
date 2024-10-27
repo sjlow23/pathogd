@@ -10,6 +10,7 @@ library(tidyr)
 #$2 : combined counts matrix
 #$3	: output directory
 #$4 : run addPAM step (yes/no)
+#$5 : cas12/13
 
 args <- commandArgs(trailingOnly=TRUE)
 threshold <- as.numeric(args[1])
@@ -71,34 +72,40 @@ if (dim(finaldf)[1] == 0) {
 
 
 ## If specified, add PAM to each k-mer passing defined threshold
-if (args[4] == "yes") {		## this is for k=22 case
-		mykmers <- finaldf %>% 
-		pull(kmer)
-	mykmers_vec <- c(paste("TTTA", mykmers, sep=""),
-		paste("TTTC", mykmers, sep=""),
-		paste("TTTG", mykmers, sep=""),
-		paste("TTTT", mykmers, sep=""))	
-	
-	## Write kmer query list to file
-	fwrite(finaldf, file=paste(args[3], "query_withpam_lookup.tsv", sep="/"), col.names=T, row.names=F, quote=F, sep="\t")
-	fwrite(as.data.frame(mykmers_vec), file=paste(args[3], "query_withpam.txt", sep="/"), col.names=F, row.names=F, quote=F, sep="\t")
-
-} else if (args[4] == "no") {	## this would be for k=kmerpam case
-	mykmers <- finaldf %>% 
-		#filter(avg_copy_number <=1) %>% 
-		separate(kmer, into=c("pam", "guide_to_order"), sep=4, remove=T)
-		# mutate(actual_pam = case_when(pam=="TAAA" ~ "TTTA", 
-		# 		      pam=="GAAA" ~ "TTTC",
-		# 		      pam=="CAAA" ~ "TTTG",
-		# 		      pam=="AAAA" ~ "TTTT",
-		# 		      TRUE ~ "NA")) %>%
-		#relocate(actual_pam, .after=pam)
-	#mykmers$guide_to_order <- sapply(mykmers$kmer, function(x) as.character(reverseComplement(DNAString(x))))
-	#mykmers <- mykmers %>%
-	#	relocate(guide_to_order, .after=kmer)
+if (args[5] == "cas12") {
+	if (args[4] == "yes") {		## this is for k=22 case
+			mykmers <- finaldf %>% 
+			pull(kmer)
+		mykmers_vec <- c(paste("TTTA", mykmers, sep=""),
+			paste("TTTC", mykmers, sep=""),
+			paste("TTTG", mykmers, sep=""),
+			paste("TTTT", mykmers, sep=""))	
 		
-	mykmers_nopam <- unique(mykmers$guide_to_order)
-	fwrite(as.data.frame(mykmers_nopam), file=paste(args[3], "kmers_withpam_offtarget_query.txt", sep="/"), col.names=F, row.names=F, quote=F, sep="\t")
-	fwrite(as.data.frame(mykmers),file=paste(args[3], "kmers_withpam_lookup.tsv", sep="/"), col.names=T, row.names=F, quote=F, sep="\t")
+		## Write kmer query list to file
+		fwrite(finaldf, file=paste(args[3], "query_withpam_lookup.tsv", sep="/"), col.names=T, row.names=F, quote=F, sep="\t")
+		fwrite(as.data.frame(mykmers_vec), file=paste(args[3], "query_withpam.txt", sep="/"), col.names=F, row.names=F, quote=F, sep="\t")
 
+	} else {	## this would be for k=kmerpam case
+		mykmers <- finaldf %>% 
+			separate(kmer, into=c("pam", "guide_to_order"), sep=4, remove=T)
+			# mutate(actual_pam = case_when(pam=="TAAA" ~ "TTTA", 
+			# 		      pam=="GAAA" ~ "TTTC",
+			# 		      pam=="CAAA" ~ "TTTG",
+			# 		      pam=="AAAA" ~ "TTTT",
+			# 		      TRUE ~ "NA")) %>%
+			#relocate(actual_pam, .after=pam)
+		#mykmers$guide_to_order <- sapply(mykmers$kmer, function(x) as.character(reverseComplement(DNAString(x))))
+		#mykmers <- mykmers %>%
+		#	relocate(guide_to_order, .after=kmer)
+			
+		mykmers_nopam <- unique(mykmers$guide_to_order)
+		fwrite(as.data.frame(mykmers_nopam), file=paste(args[3], "kmers_withpam_offtarget_query.txt", sep="/"), col.names=F, row.names=F, quote=F, sep="\t")
+		fwrite(as.data.frame(mykmers),file=paste(args[3], "kmers_withpam_lookup.tsv", sep="/"), col.names=T, row.names=F, quote=F, sep="\t")
+
+	}
+
+} else {
+	mykmers_vec <- finaldf %>% pull(kmer)
+	fwrite(finaldf, file=paste(args[3], "query_nopam_lookup.tsv", sep="/"), col.names=T, row.names=F, quote=F, sep="\t")
+	fwrite(as.data.frame(mykmers_vec), file=paste(args[3], "query_nopam.txt", sep="/"), col.names=F, row.names=F, quote=F, sep="\t")
 }
