@@ -54,7 +54,7 @@ logger() {
 }
 
 
-if [[ $# -lt 8 ]]
+if [[ $# -lt 6 ]]
 then
 	   usage
 	   exit 0
@@ -88,10 +88,10 @@ if [[ -z "$IN" ]]; then
 	usage
 fi
 
-if [[ -z "$CAS" ]]; then
-	echo -e "\nCas nuclease type \"-p\" must be specified!\n"
-	usage
-fi
+#if [[ -z "$CAS" ]]; then
+#	echo -e "\nCas nuclease type \"-p\" must be specified!\n"
+#	usage
+#fi
 
 if [[ -z "$MODE" ]]; then
 	echo -e "\nWorkflow \"-w\" must be specified!\n"
