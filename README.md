@@ -144,7 +144,7 @@ Do not modify the file other than to include your specifications. Input your spe
 The command for running PathoGD is:
 
    ```sh
-   pathogd [-c <config file>] [-m <method (optional)>] [-w <workflow>] [-o <output directory>] [-r <reference genbank file (optional)>] [-t <number of cpus (default 8)>]
+   pathogd [-c <config file>] [-p <cas (optional)>] [-a <amplification method (optional)] [-m <method (optional)>] [-w <workflow>] [-o <output directory>] [-r <reference genbank file (optional)>] [-t <number of cpus (default 8)>] 
    ```
 
 To see all options, run `pathogd -h`. Some examples of usage are described below:
@@ -176,7 +176,7 @@ If your target or non-target taxa includes multiple species, *eg.* all species b
    **d) Run the following command:**
 
    ```sh
-   pathogd -c config.txt -w check -o pathogd_output
+   pathogd -c config.txt -w check -o pathogd_output -t 8
    ```
 
    **Important notes:**
@@ -204,13 +204,13 @@ Use this to automatically download genome assemblies for target and/or non-targe
    _Download target genomes_
 
    ```sh
-   pathogd -c config.txt -w download_target -o pathogd_output
+   pathogd -c config.txt -w download_target -o pathogd_output -t 8
    ```
 
    _Download non-target genomes_
 
    ```sh
-   pathogd -c config.txt -w download_nontarget -o pathogd_output
+   pathogd -c config.txt -w download_nontarget -o pathogd_output -t 8
    ```
 
    **Important notes:**
@@ -236,13 +236,13 @@ Examples using *Mycoplasmoides genitalium* for either pangenome or *k*-mer modul
    Pangenome module:
 
    ```sh
-   pathogd -c config.txt -m pangenome -w ncbi_all_nosubsample -o pathogd_output
+   pathogd -c config.txt -m pangenome -w ncbi_all_nosubsample -o pathogd_output -t 16
    ```
 
    *k*-mer module:
 
    ```sh
-   pathogd -c config.txt -m kmer -w ncbi_all_nosubsample -o pathogd_output
+   pathogd -c config.txt -m kmer -w ncbi_all_nosubsample -o pathogd_output -t 16
    ```
 
    The following examples are for the pangenome module. To use the *k*-mer module, replace `-m pangenome` with `-m kmer` in the commands below: 
@@ -250,7 +250,7 @@ Examples using *Mycoplasmoides genitalium* for either pangenome or *k*-mer modul
    **b) Download genome assemblies from NCBI, subsample target genomes to total specified in config file**
 
    ```sh
-   pathogd -c config.txt -m pangenome -w ncbi_all_subsample -o pathogd_output
+   pathogd -c config.txt -m pangenome -w ncbi_all_subsample -o pathogd_output -t 16
    ```
 
 The following examples are for cases where genomes are provided by the user.
@@ -262,14 +262,14 @@ Deposit your target and non-target genomes into their respective directories. Th
    **c) Provide own target and non-target genomes, no subsampling of target genomes**
    
    ```sh
-   pathogd -c config.txt -m pangenome -w user_all_nosubsample -o pathogd_output
+   pathogd -c config.txt -m pangenome -w user_all_nosubsample -o pathogd_output -t 16
    ```
 
 
    **d) Provide own target genomes, download non-target genomes from NCBI, no subsampling of target genomes**
    
    ```sh
-   pathogd -c config.txt -m pangenome -w user_target_nosubsample -o pathogd_output
+   pathogd -c config.txt -m pangenome -w user_target_nosubsample -o pathogd_output -t 16
    ```
 
 
@@ -307,7 +307,7 @@ Although designed primarily for Cas12a applications, the guide RNAs designed can
 To design guide RNAs without the TTTN PAM restriction, add the **`-p`** flag:
 
    ```sh
-   pathogd -c config.txt -m pangenome -p cas13 -w user_target_nosubsample -o pathogd_output
+   pathogd -c config.txt -m pangenome -p cas13 -w user_target_nosubsample -o pathogd_output -t 16
    ```
 
 
@@ -317,7 +317,7 @@ By default, PathoGD designs primers using parameters suited for RPA applications
 To design primers for use with regular PCR, add the **`-a`** flag:
 
    ```sh
-   pathogd -c config.txt -m pangenome -p cas13 -a pcr -w user_target_nosubsample -o pathogd_output
+   pathogd -c config.txt -m pangenome -p cas13 -a pcr -w user_target_nosubsample -o pathogd_output -t 16
    ```
    
 
