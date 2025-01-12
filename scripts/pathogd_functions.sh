@@ -1393,7 +1393,7 @@ get_kmers_offtarget_pam() {
 		-o "{}"' 
 
 		## Remove list so combined_offtarget_$kmer is not combined
-		glistcompare *.list --union -o combined_batches/combined_samples_"$counter"
+		glistcompare *_"$kmerpam".list --union -o combined_batches/combined_samples_"$counter"
 		[[ -s combined_batches/combined_samples_"$counter"_"$kmerpam"_union.list ]] && rm "$KMER_OFFTARGET"/*"$kmerpam".list
 
 	done
