@@ -1,1 +1,4 @@
 .DS_Store
+pathogd_output*/
+database/
+slurm*
