@@ -9,6 +9,20 @@ check_assemblies_taxid() {
 	cd "$OUTPUT"
 	logger "Checking number of genome assemblies available for '$target_species'" 
 	MYORG="$domain"
+	
+	if [[ "$assembly_level" == "complete" ]]; then
+		MYLEVEL="Complete Genome"
+	elif [[ "$assembly_level" == "chromosome" ]]; then
+		MYLEVEL="Chromosome"
+	elif [[ "$assembly_level" == "scaffold" ]]; then
+		MYLEVEL="Scaffold"
+	elif [[ "$assembly_level" == "contig" ]]; then
+		MYLEVEL="Contig"
+	else
+		MYLEVEL="all"
+	fi
+	
+	echo "$MYLEVEL"
 
 	if [ ! -f "genbank.txt" ] || [ ! -f "refseq.txt" ]; then  # condition to avoid redownload of summaries for testing - can be removed if behaviour not desired
 			wget https://ftp.ncbi.nlm.nih.gov/genomes/genbank/$MYORG/assembly_summary.txt --output-document=genbank.txt
@@ -39,21 +53,22 @@ check_assemblies_taxid() {
 
 		# If using taxids
 		if [[ -n "$target_taxid" ]]; then
-			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/target_sptaxids.txt "$OUTPUT"/${db}.txt > target_${db}.txt
-			
+			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/target_sptaxids.txt "$OUTPUT"/${db}.txt | awk -F "\t" '{if ("'"$MYLEVEL"'" == "all" || $12 == "'"$MYLEVEL"'") print}' > target_${db}.txt
+
 		# If using species name
 		else
 			# if multiple species present
 			if [[ "$target_species" == *,* ]]; then
 				target_taxa=$(sed 's/,/|/g' <<< "$target_species")
-				egrep -w "$target_taxa" "$OUTPUT"/${db}.txt > target_${db}.txt
+				egrep -w "$target_taxa" "$OUTPUT"/${db}.txt | awk -F "\t" '{if ("'"$MYLEVEL"'" == "all" || $12 == "'"$MYLEVEL"'") print}' > target_${db}.txt
 			else
-				grep -w "$target_species" "$OUTPUT"/${db}.txt > target_${db}.txt
+				grep -w "$target_species" "$OUTPUT"/${db}.txt | awk -F "\t" '{if ("'"$MYLEVEL"'" == "all" || $12 == "'"$MYLEVEL"'") print}' > target_${db}.txt
+				
 			fi
 		fi
 	
 		target_count=$(wc -l <target_${db}.txt)
-		logger ""$target_count" "$mydb" assemblies found for target taxa"
+		logger ""$target_count" '$assembly_level' "$mydb" assemblies found for target taxa"
 
 		# Subsample target genomes to maximum of 1000 per species (using species taxid column 7) if overrepresented
 		cut -f7 target_${db}.txt | sort | uniq -c | sed 's/^[ \t]*//' | sed 's/ /\t/1' | 
@@ -82,16 +97,18 @@ check_assemblies_taxid() {
 		# Offtarget genomes
 		# If using taxids
 		if [[ -n "$offtarget_taxid" ]]; then
-			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/nontarget_sptaxids.txt "$OUTPUT"/${db}.txt > offtarget_${db}_tmp.txt
+			awk 'FNR==NR { a[$1]; next } ($7 in a)' "$OUTPUT"/nontarget_sptaxids.txt "$OUTPUT"/${db}.txt | awk -F "\t" '{if ("'"$MYLEVEL"'" == "all" || $12 == "'"$MYLEVEL"'") print}' > offtarget_${db}_tmp.txt
+			
 			# rm "$OUTPUT"/nontarget_sptaxids.txt  # fix: this removes the file in the second iteration (refseq) and break the workflow
 		# if using species name
 		else
 			if [[ "$offtarget" == *,* ]]; then
 				#offtarget_taxa=$(echo "$offtarget_taxa" | sed 's/,/|/g')
 				offtarget_taxa=$(sed 's/,/|/g' <<< "$offtarget_species")
-				egrep -w "$offtarget_taxa" "$OUTPUT"/${db}.txt > offtarget_${db}_tmp.txt
+				egrep -w "$offtarget_taxa" "$OUTPUT"/${db}.txt | awk -F "\t" '{if ("'"$MYLEVEL"'" == "all" || $12 == "'"$MYLEVEL"'") print}' > offtarget_${db}_tmp.txt
+				
 			else
-				grep -w "$offtarget_species" "$OUTPUT"/${db}.txt > offtarget_${db}_tmp.txt
+				grep -w "$offtarget_species" "$OUTPUT"/${db}.txt | awk -F "\t" '{if ("'"$MYLEVEL"'" == "all" || $12 == "'"$MYLEVEL"'") print}' > offtarget_${db}_tmp.txt
 			fi
 		fi
 
@@ -101,7 +118,7 @@ check_assemblies_taxid() {
 		rm offtarget_${db}_tmp.txt
 
 		offtarget_count=$(wc -l <"offtarget_${db}.txt")
-		logger ""$offtarget_count" "$mydb" assemblies found for non-target taxa"
+		logger ""$offtarget_count" '$assembly_level' "$mydb" assemblies found for non-target taxa"
 
 		# Subsample offtarget genomes to maximum of 100 per species (using species_taxid column 7) if overrepresented
 		cut -f7 offtarget_${db}.txt | sort | uniq -c | sed 's/^[ \t]*//' | sed 's/ /\t/1' | 
