@@ -419,7 +419,7 @@ However, they can still be useful for an assay not requiring a pre-amplification
 
 If you use this tool in your research, please cite:
 
-    "PathoGD: an integrative genomics approach for CRISPR-based target design of rapid pathogen diagnostics"
+    "PathoGD: an integrative genomics approach to primer and guide RNA design for CRISPR-based diagnostics"
     Soo Jen Low, Matthew O'Neill, William J. Kerry, Natasha Wild, Marcelina Krysiak, Yi Nong, Francesca Azzato, Eileen Hor, Lewis Williams, George Taiaroa, Eike Steinig, Shivani Pasricha, Deborah A. Williamson
-    bioRxiv 2024.05.14.593882; doi: https://doi.org/10.1101/2024.05.14.593882 
-[PathoGD: an integrative genomics approach for CRISPR-based target design of rapid pathogen diagnostics](https://www.biorxiv.org/content/10.1101/2024.05.14.593882v1.full)
+    Commun Biol **8**, 147 (2025). https://doi.org/10.1038/s42003-025-07591-1
+[PathoGD: an integrative genomics approach to primer and guide RNA design for CRISPR-based diagnostics](https://www.nature.com/articles/s42003-025-07591-1)
