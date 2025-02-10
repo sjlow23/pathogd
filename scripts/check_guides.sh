@@ -5,7 +5,8 @@ usage() {
 	echo -e "  $0 [-i <guides input>] [-d <genome db directory>] [-o <output file>] [-t <number of cpus>]\n"
 	echo -e "	-i	Input fasta file containing guide RNA sequences\n"
 	echo -e "	-d	Directory containing target and non-target genome databases\n"
-	echo -e	"	-o	Output file name (default: pathogd_guide_prevalence.tsv)\n"
+	echo -e	"	-o	Output file name (default: pathogd_guides_prevalence.tsv)\n"
+	echo -e "   -p  Cas type (cas12 or cas13; default: cas12)\n"
 	echo -e	"	-t 	Number of cpus (default: 8)\n"
 	echo -e "	-h  Print this help menu\n"
 	exit 0
@@ -23,12 +24,13 @@ then
 	usage
 	exit 0
 else
-	while getopts "i:d:o:t:h" opt
+	while getopts "i:d:o:p:t:h" opt
 	do
 		case $opt in
 			i) IN=$OPTARG;;
 			d) GENOMEDIR=$OPTARG;;
 			o) OUTPUT=$OPTARG;;
+			p) CAS=$OPTARG;;
 			t) CPU=$OPTARG;;
 			h) usage;;
 			\?) echo -e "\nInvalid option: -$OPTARG"
@@ -44,20 +46,23 @@ fi
 # Exit if mandatory arguments missing
 
 if [[ -z "$IN" ]]; then
-    echo -e "\nInput file \"-i\" with guide sequences must be provided!\n"
-    usage
+	echo -e "\nInput file \"-i\" with guide sequences must be provided!\n"
+	usage
 fi
 
 
 if [[ -z "$GENOMEDIR" ]]; then
-    echo -e "\nDirectory \"-d\" containing target and non-target genomes must be specified!\n"
-    usage
+	echo -e "\nDirectory \"-d\" containing target and non-target genomes must be specified!\n"
+	usage
 fi
 
 if [[ -z "$OUTPUT" ]]; then
 	OUTPUT="pathogd_guides_prevalence.tsv"
 fi
 
+if [[ -z "$CAS" ]]; then
+	CAS="cas12"
+fi
 
 if [[ -z "$CPU" ]]; then
 	CPU=8
@@ -71,7 +76,7 @@ MYDIR=$PWD
 GENOMEDIR=$(basename $GENOMEDIR)
 OUTDIR=$MYDIR/$GENOMEDIR/guide_stats
 IN=$(readlink -f $IN)
-IN_PAM=""${IN%.*}"_pam.fasta"
+IN_PAM=""${IN%.*}"_input.fasta"
 LOG=$OUTDIR/pathogd.log
 
 
@@ -114,14 +119,30 @@ guidecount=$(grep -c ">" $IN)
 
 
 ## Generate input sequences with canonical PAM
-awk '{ print "TTTA"$0; print "TTTC"$0; print "TTTG"$0; print "TTTT"$0; }'
+#awk '{ print "TTTA"$0; print "TTTC"$0; print "TTTG"$0; print "TTTT"$0; }'
 
-seqkit fx2tab $IN | 
-	awk '{ print $1"--TTTA", "TTTA"$2;
-	print $1"--TTTC", "TTTC"$2; 
-	print $1"--TTTG", "TTTG"$2;
-	print $1"--TTTT", "TTTT"$2 }' OFS="\t" |
-	seqkit tab2fx > "$IN_PAM"
+awk 'BEGIN{FS=OFS="\n"} 
+    # Check if "--" present in header
+    /^>/ { 
+        if ($0 ~ /--/) {
+            # Replace '--' with "||" in the header line if present
+            gsub(/--/, "||", $0)
+        }
+    } { print $0 }' "$IN" > "$IN".tmp
+
+if [[ $CAS == "cas12" ]]
+then
+	seqkit fx2tab $IN.tmp | 
+		awk '{ print $1"--TTTA", "TTTA"$2;
+		print $1"--TTTC", "TTTC"$2; 
+		print $1"--TTTG", "TTTG"$2;
+		print $1"--TTTT", "TTTT"$2 }' OFS="\t" |
+		seqkit tab2fx > "$IN_PAM"
+else
+	seqkit fx2tab $IN.tmp | 
+		awk '{ print $1"--NA", $2 }' OFS="\t" |
+		seqkit tab2fx > "$IN_PAM"
+fi
 
 
 ## Function to run guide mapping
@@ -138,46 +159,46 @@ process_cigar() {
 		# Get bounds tag
 		boundstag="${fields[-1]}"
 
-    	# Get the relevant columns
-    	read_name="${fields[0]}"
-    	cigar="${fields[5]}"
+		# Get the relevant columns
+		read_name="${fields[0]}"
+		cigar="${fields[5]}"
 
-    	# Check if the mapping is on the reverse strand
-    	is_reversed=false
-    	if (( ${fields[1]} & 16 )); then
-    		is_reversed=true
-    	fi
+		# Check if the mapping is on the reverse strand
+		is_reversed=false
+		if (( ${fields[1]} & 16 )); then
+			is_reversed=true
+		fi
 
-    	# Break down the CIGAR string into individual components
-    	components=()
-    	current_component=""
-    	for (( i=0; i<${#cigar}; i++ )); do
-    		char="${cigar:$i:1}"
-    		if [[ $char =~ [0-9] ]]; then
-    			current_component+=$char
-    		else
-    			components+=("$current_component$char")
-    			current_component=""
-    		fi
-    	done
+		# Break down the CIGAR string into individual components
+		components=()
+		current_component=""
+		for (( i=0; i<${#cigar}; i++ )); do
+			char="${cigar:$i:1}"
+			if [[ $char =~ [0-9] ]]; then
+				current_component+=$char
+			else
+				components+=("$current_component$char")
+				current_component=""
+			fi
+		done
 
-    	 # Generate the expanded CIGAR string
-    	 expanded_string=""
-    	 num_X=0
-    	 num_S=0
-    	 for component in "${components[@]}"; do
-    	 	countx="${component%[=X]}"
-    	 	counts="${component%[=S]}"
-    	 	count="${component%[=X|S]}"
-    	 	op="${component: -1}"
-    	 	expanded_string+=$(printf "$op%.0s" $(seq 1 "$count"))
-    	 	if [[ $op == "X" ]]; then
-    	 		num_X=$((num_X + countx))
-    	 	fi
-    	 	if [[ $op == "S" ]]; then
-    	 		num_S=$((num_S + counts))
-    	 	fi
-    	 done
+		 # Generate the expanded CIGAR string
+		 expanded_string=""
+		 num_X=0
+		 num_S=0
+		 for component in "${components[@]}"; do
+		 	countx="${component%[=X]}"
+		 	counts="${component%[=S]}"
+		 	count="${component%[=X|S]}"
+		 	op="${component: -1}"
+		 	expanded_string+=$(printf "$op%.0s" $(seq 1 "$count"))
+		 	if [[ $op == "X" ]]; then
+		 		num_X=$((num_X + countx))
+		 	fi
+		 	if [[ $op == "S" ]]; then
+		 		num_S=$((num_S + counts))
+		 	fi
+		 done
 
 	# Reverse the expanded string if the mapping is on the reverse strand
 	if $is_reversed; then
@@ -267,17 +288,38 @@ map_guides() {
 		# Remove alignment if soft-clipped, except for sequences mapping to edge of reference genome/contig
 		awk -F "\t" '{ if ($5==0 || ($5!=0 && $6=="XB:Z:O")) print $1, $2, $3, $4, $5 }' OFS="\t" $outfile > "$outfile".2
 
-		# Filter by allowed mismatches
-		# Max 2 mismatches (both must be PAM-distal)
-		awk 'BEGIN{FS=OFS="\t"} {print $1, $2, $4, substr($3,1,4), substr($3,5,7), substr($3,12)}' "$outfile".2 > tmp
-		awk 'BEGIN{FS=OFS="\t"} { mm_pam = gsub(/X/, "X", $4); 
-		mm_seed = gsub(/X/, "X", $5); 
-		mm_distal = gsub(/X/, "X", $6); print $0, mm_pam, mm_seed, mm_distal }' tmp |
-		## Filter alignments with 2 or lesser mismatches
-		awk -F "\t" '$3<=2 && $7==0 && $8==0' > $outfile
-		rm tmp "$outfile".2
+		if [[ $CAS == "cas12" ]]
+		then
+			# Filter by allowed mismatches
+			# Max 2 mismatches (both must be PAM-distal)
+			
+			awk 'BEGIN{FS=OFS="\t"} {print $1, $2, $4, substr($3,1,4), substr($3,5,7), substr($3,12)}' "$outfile".2 > tmp
+			awk 'BEGIN{FS=OFS="\t"} { mm_pam = gsub(/X/, "X", $4); 
+			mm_seed = gsub(/X/, "X", $5); 
+			mm_distal = gsub(/X/, "X", $6); print $0, mm_pam, mm_seed, mm_distal }' tmp |
+			## Filter alignments with 2 or lesser mismatches
+			awk -F "\t" '$3<=2 && $7==0 && $8==0' > $outfile
+			rm tmp "$outfile".2
 
-		sed -i '1i genome\tguide\tmismatch_count\tcigar_pam\tcigar_seed\tcigar_distal\tmm_pam\tmm_seed\tmm_distal' $outfile
+			sed -i '1i genome\tguide\tmismatch_count\tcigar_pam\tcigar_seed\tcigar_distal\tmm_pam\tmm_seed\tmm_distal' $outfile
+		fi
+
+		if [[ $CAS == "cas13" ]]
+		then
+			# Filter by allowed mismatches
+			# Max 2 mismatches (both must be PAM-distal)
+			awk 'BEGIN{FS=OFS="\t"} {print $1, $2, $4, substr($3,1,8), substr($3,9)}' "$outfile".2 > tmp
+
+			awk 'BEGIN{FS=OFS="\t"} { 
+				mm_seed = gsub(/X/, "X", $4); 
+				mm_distal = gsub(/X/, "X", $5); 
+				print $0, mm_seed, mm_distal }' tmp |
+			## Filter alignments with 2 or lesser mismatches in overall spacer sequence
+			awk -F "\t" '$3<=2' > $outfile
+			rm tmp "$outfile".2
+
+			sed -i '1i genome\tguide\tmismatch_count\tcigar_seed\tcigar_distal\tmm_seed\tmm_distal' $outfile
+		fi
 
 		# Summarize by guide (for 0, 1 and 2 mismatches)
 		for i in 0 1 2; do
@@ -292,16 +334,21 @@ map_guides() {
 			csvtk round -t -f guide_avg_copy_number_mm"$i" -n 1 | 
 			csvtk cut -t -f -genome:countunique,-genome:count > $OUTDIR/"$1"_mm"$i"_$OUTPUT; done
 
+		sed -i 's/||/--/g' $outfile
+		sed -i 's/--NA\t/\t/g' $outfile
+
 		# Join if file not empty
 		find . -size 0 -name "*mm*.tsv" -type f -print -delete
 
 		csvtk join -t -f guide $OUTDIR/"$1"_mm*_$OUTPUT > $OUTDIR/"$1"_$OUTPUT
+		sed -i 's/||/--/g' $OUTDIR/"$1"_$OUTPUT
+		sed -i 's/--NA\t/\t/g' $OUTDIR/"$1"_$OUTPUT
 
-		rm $OUTDIR/"$1"_mm*_$OUTPUT
-
+		rm $OUTDIR/"$1"_mm*_$OUTPUT 
+		rm "$IN".tmp
 	else
 		logger "No guide hits to "$1" genomes"
-		#rm -rf "$mydir"
+		rm -rf "$mydir"
 	fi
 
 	cd $MYDIR
