@@ -118,8 +118,7 @@ fi
 guidecount=$(grep -c ">" $IN)
 
 
-## Generate input sequences with canonical PAM
-#awk '{ print "TTTA"$0; print "TTTC"$0; print "TTTG"$0; print "TTTT"$0; }'
+## Generate input sequences with canonical PAM for cas12
 
 awk 'BEGIN{FS=OFS="\n"} 
     # Check if "--" present in header
