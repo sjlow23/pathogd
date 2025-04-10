@@ -1350,9 +1350,9 @@ get_kmers_offtarget() {
 	
 	cd $KMER_OFFTARGET
 	
-	#Process files in batches of 200
+	#Process files in batches of 20
 	counter=0
-	cat $OUTPUT/genomes_offtarget.txt | xargs -n 200 | \
+	cat $OUTPUT/genomes_offtarget.txt | xargs -n 20 | \
 	while read -r genome
 	do
 		counter=$((counter + 1))
@@ -1398,7 +1398,7 @@ get_kmers_offtarget_pam() {
 	cd $KMER_OFFTARGET
 
 	counter=0
-	cat $OUTPUT/genomes_offtarget.txt | xargs -n 200 | \
+	cat $OUTPUT/genomes_offtarget.txt | xargs -n 20 | \
 	while read -r genome
 	do
 		counter=$((counter + 1))
@@ -1470,7 +1470,7 @@ get_kmers_target() {
 		# parallel -j "$MAX_PARALLEL_JOBS" 'glistcompare "{}" \
 		# --union -o combined_batches/combined_samples_"{#}"'
 
-		awk '{ print $0"_"'$kmer'".list" }' $myfile | xargs -L 200 | \
+		awk '{ print $0"_"'$kmer'".list" }' $myfile | xargs -L 20 | \
 		awk '{ print NR, $0 }' OFS="\t" | \
 		awk -F "\t" '{ print "glistcompare "$2" --union -o combined_batches/combined_samples_"$1"" }' > run.sh
 
@@ -1737,7 +1737,8 @@ get_uniq_target_kmer_withpam() {
 	cat header.txt combined_counts.txt > combined_counts_final.txt
 
 	logger "Parsing k="$kmerpam" results in R"
-	filter_kmers.R "$threshold" $KMER_TARGET_PAM/combined_counts_final.txt $KMER_TARGET_PAM no
+
+	filter_kmers.R "$threshold" $KMER_TARGET_PAM/combined_counts_final.txt $KMER_TARGET_PAM no $CAS
 	
 	cd $OUTPUT
 
@@ -2018,7 +2019,7 @@ split_amplicons() {
 
 	find "$ALIGN_OUT" -maxdepth 1 -type f -name "*template.fasta" -exec cat {} + > "$ALIGN_OUT"/combined_templates.fasta
 
-	rm -rf coord_out
+	#rm -rf coord_out
 
 	## Depending on assembly method of ref genomes, there may be duplicates in header id, and
 	## this will cause problems downstream when extracting using subseq, as subseq only takes 
@@ -2077,7 +2078,13 @@ process_individual_guides() {
 	fi
 
 	## Minimum number of sequences required to keep cluster (80% of target genome count)
-	local cluster_cutoff=$(wc -l $myfile | awk '{ print $1*0.8 }')
+	if [[ "$domain" == "bacteria" ]]; then
+		local cluster_cutoff=$(wc -l $myfile | awk '{ print $1*0.8 }')
+		local seq_id=0.9
+	else
+		local cluster_cutoff=$(wc -l $myfile | awk '{ print $1*0.3 }')
+		local seq_id=0.8
+	fi
 
 
 	# Get list of guide names
@@ -2102,7 +2109,7 @@ process_individual_guides() {
 		#Cluster sequences
 		#logger "Clustering guide amplicons with cd-hit"
 		parallel -a "$i" -j "$MAX_JOBS" 'cd-hit-est -i "{}".fasta -T '"$MAX_THREADS_PER_JOB"' \
-		-c 0.90 -n 9 -g 1 -d 1000 -M 32000 -o "{}".cdhit; \
+		-c '"$seq_id"' -n 9 -g 1 -d 1000 -M 32000 -o "{}".cdhit; \
 		make_multi_seq2.pl "{}".fasta "{}".cdhit.clstr alignments '"$cluster_cutoff"' "{}"; \
 		rm "{}".fasta; rm "{}".cdhit; rm "{}".cdhit.clstr'
 
@@ -2434,7 +2441,7 @@ run_fast_ispcr() {
 		target_amplicons/"{}"_amp.fasta; sed -i "s/primerset/>"{}"--primerset/g" target_amplicons/"{}"_amp.fasta'
 
 		cat target_amplicons/*_amp.fasta > amplicons_target.fasta
-		rm -rf target_amplicons
+		#rm -rf target_amplicons
 		sed -i 's/^>[^ ]* \([^ ]*\).*/>\1/' amplicons_target.fasta
 	fi
 	
