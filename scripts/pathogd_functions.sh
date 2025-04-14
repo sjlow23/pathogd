@@ -2019,7 +2019,7 @@ split_amplicons() {
 
 	find "$ALIGN_OUT" -maxdepth 1 -type f -name "*template.fasta" -exec cat {} + > "$ALIGN_OUT"/combined_templates.fasta
 
-	#rm -rf coord_out
+	rm -rf coord_out
 
 	## Depending on assembly method of ref genomes, there may be duplicates in header id, and
 	## this will cause problems downstream when extracting using subseq, as subseq only takes 
@@ -2431,7 +2431,7 @@ run_fast_ispcr() {
 	mkdir -p target_amplicons
 
 	# Write amplicons to file (for determining cas13a gRNA strand)
-	if [[ $CAS == "cas13" ]]; then
+	if [[ $METHOD == "kmer" ]]; then
 		cat $OUTPUT/genomes_target.txt | \
 		parallel -j "$MAX_JOBS" \
 		'isPcr -maxSize=500 \
@@ -2441,7 +2441,7 @@ run_fast_ispcr() {
 		target_amplicons/"{}"_amp.fasta; sed -i "s/primerset/>"{}"--primerset/g" target_amplicons/"{}"_amp.fasta'
 
 		cat target_amplicons/*_amp.fasta > amplicons_target.fasta
-		#rm -rf target_amplicons
+		rm -rf target_amplicons
 		sed -i 's/^>[^ ]* \([^ ]*\).*/>\1/' amplicons_target.fasta
 	fi
 	
